@@ -26,3 +26,7 @@ ortex-*.tar
 /tmp/
 /priv/native/
 /bench/results/
+/runtime/
+/dist/
+/checksum-Elixir.Ortex.Native.exs
+/Dockerfile.precompiled-alpine.dockerignore

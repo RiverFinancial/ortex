@@ -1,0 +1,40 @@
+name: Publish Hex package
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+  attestations: read
+jobs:
+  publish:
+    if: github.repository == 'RiverFinancial/ortex'
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MIX_ENV: prod
+      ORTEX_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - name: Download and verify release artifacts
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release download "$RELEASE_TAG" --dir dist
+          for artifact in dist/*; do
+            gh attestation verify "$artifact" --repo RiverFinancial/ortex
+          done
+          cp dist/checksum-Elixir.Ortex.Native.exs .
+      - name: Publish to Hex (requires ownership and HEX_API_KEY)
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: |
+          test -n "$HEX_API_KEY"
+          mix local.hex --force
+          mix deps.get --check-locked
+          mix hex.publish --yes

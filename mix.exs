@@ -1,18 +1,21 @@
 defmodule Ortex.MixProject do
   use Mix.Project
 
+  @version "0.2.0"
+
   def project do
     [
       app: :ortex,
-      version: "0.1.10",
-      elixir: "~> 1.14",
+      version: @version,
+      elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
+      test_ignore_filters: [~r/test\/fixtures\//],
       deps: deps(),
 
       # Docs
       name: "Ortex",
-      source_url: "https://github.com/elixir-nx/ortex",
-      homepage_url: "http://github.com/elixir-nx/ortex",
+      source_url: "https://github.com/RiverFinancial/ortex",
+      homepage_url: "https://github.com/RiverFinancial/ortex",
       docs: [
         main: "readme",
         extras: ["README.md"]
@@ -24,14 +27,16 @@ defmodule Ortex.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {Ortex.Application, []}
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:rustler, "~> 0.27"},
+      {:rustler, "~> 0.38.0", optional: true},
+      {:rustler_precompiled, "~> 0.10.1"},
       {:nx, "~> 0.6"},
       {:tokenizers, "~> 0.4", only: :dev},
       {:ex_doc, "0.29.4", only: :dev, runtime: false},
@@ -42,10 +47,11 @@ defmodule Ortex.MixProject do
 
   defp package do
     [
-      files: ~w(lib .formatter.exs mix.exs README* LICENSE* native/ortex/src/ config/config.exs
+      files:
+        ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG* checksum-*.exs docs native/ortex/src/ config/config.exs
         native/ortex/Cargo.lock native/ortex/Cargo.toml native/ortex/.cargo/config.toml),
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/elixir-nx/ortex"},
+      links: %{"GitHub" => "https://github.com/RiverFinancial/ortex"},
       description: "ONNX Runtime bindings for Elixir"
     ]
   end

@@ -1,0 +1,127 @@
+name: Precompiled NIFs
+on:
+  push:
+    branches: [main, 'codex/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: aarch64-apple-darwin, os: macos-15, runtime: '1.24.4'}
+          - {target: x86_64-apple-darwin, os: macos-15-intel, runtime: '1.22.0'}
+          - {target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, runtime: '1.24.4'}
+          - {target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, runtime: '1.24.4'}
+          - {target: x86_64-unknown-linux-musl, os: ubuntu-22.04}
+          - {target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm}
+          - {target: x86_64-pc-windows-msvc, os: windows-2022, runtime: '1.24.4'}
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Select version
+        run: |
+          version=$(sed -n 's/^  @version "\(.*\)"$/\1/p' mix.exs)
+          test -n "$version"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "${GITHUB_REF#refs/tags/v}" = "$version"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Install Rust
+        run: rustup toolchain install 1.93.1 --profile minimal --target "$TARGET"
+      - name: Install musl linker
+        if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          echo "CARGO_TARGET_$(echo "$TARGET" | tr '[:lower:]-' '[:upper:]_')_LINKER=musl-gcc" >> "$GITHUB_ENV"
+      - name: Build the NIF without ONNX Runtime installed
+        working-directory: native/ortex
+        run: cargo +1.93.1 build --release --locked --target "$TARGET"
+      - name: Package NIF
+        run: python scripts/package_nif.py "$TARGET" "$VERSION"
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        if: ${{ !contains(matrix.target, 'musl') }}
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - name: Install test runtime
+        if: ${{ !contains(matrix.target, 'musl') }}
+        run: python scripts/install_runtime.py '${{ matrix.runtime }}'
+      - name: Test precompiled consumer (Rust compilation forbidden)
+        if: ${{ !contains(matrix.target, 'musl') }}
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get --check-locked
+          bash scripts/check_precompiled.sh dist
+      - name: Test precompiled consumer on Alpine without a Rust toolchain
+        if: contains(matrix.target, 'musl')
+        run: |
+          # Docker COPY can explicitly include a path excluded by .dockerignore
+          # only when the path is present in the context, so use a dedicated ignore file.
+          cp .dockerignore Dockerfile.precompiled-alpine.dockerignore
+          sed -i '/^dist$/d' Dockerfile.precompiled-alpine.dockerignore
+          docker build --progress=plain -f Dockerfile.precompiled-alpine .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nif-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'RiverFinancial/ortex'
+    needs: [build, validate-release]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MIX_ENV: prod
+      ORTEX_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: nif-*
+          merge-multiple: true
+          path: dist
+      - name: Generate checksums and Hex package
+        run: |
+          elixir scripts/checksums.exs dist --all
+          cp checksum-Elixir.Ortex.Native.exs dist/
+          mix local.hex --force
+          mix deps.get --check-locked
+          mix hex.build
+          cp ortex-*.tar dist/
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*
+      - name: Stage GitHub release for review
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --draft --verify-tag --generate-notes
+          gh release upload "$RELEASE_TAG" dist/* --clobber

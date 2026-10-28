@@ -1,81 +1,65 @@
 //! Serialization and deserialization to transfer between Ortex and BinaryBackend
 //! [Nx](https://hexdocs.pm/nx) backend.
 
-use crate::constants::*;
 use crate::tensor::OrtexTensor;
-use ndarray::{ArrayViewMut, Ix, IxDyn};
+use ndarray::{ArrayD, IxDyn};
 
-use ndarray::ShapeError;
-
-use rustler::resource::ResourceArc;
 use rustler::types::Binary;
+use rustler::ResourceArc;
 use rustler::{Atom, Env, NifResult};
 
-use ort::{ExecutionProviderDispatch, GraphOptimizationLevel};
+use ort::{ep::ExecutionProviderDispatch, session::builder::GraphOptimizationLevel};
 
-/// A faster (unsafe) way of creating an Array from an Erlang binary
-fn initialize_from_raw_ptr<T>(ptr: *const T, shape: &[Ix]) -> ArrayViewMut<T, IxDyn> {
-    let array = unsafe { ArrayViewMut::from_shape_ptr(shape, ptr as *mut T) };
-    array
-}
-
-/// Given a Binary term, shape, and dtype from the BEAM, constructs an OrtexTensor and
-/// returns the reference to be used as an Nx.Backend representation.
-///
-/// # Example
-///
-/// ```elixir
-/// bin = <<1, 0, 0, 0, 1, 0, 0, 0>>
-/// ```
-///
-/// Create a shape `[2]` u32 OrtexTensor from a binary of 8 bytes
-/// ```elixir
-/// {:ok, reference} = from_binary(bin, {2}, {:u, 32})
-/// ```
+// BEAM sub-binaries are not guaranteed to be aligned. Decode into owned storage
+// rather than manufacturing a mutable ndarray view over an immutable binary.
 pub fn from_binary(
     bin: Binary,
     shape: Vec<usize>,
     dtype_str: String,
     dtype_bits: usize,
-) -> Result<ResourceArc<OrtexTensor>, ShapeError> {
-    match (dtype_str.as_ref(), dtype_bits) {
-        ("bf", 16) => Ok(ResourceArc::new(OrtexTensor::bf16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const half::bf16, &shape).to_owned(),
-        ))),
-        ("f", 16) => Ok(ResourceArc::new(OrtexTensor::f16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const half::f16, &shape).to_owned(),
-        ))),
-        ("f", 32) => Ok(ResourceArc::new(OrtexTensor::f32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const f32, &shape).to_owned(),
-        ))),
-        ("f", 64) => Ok(ResourceArc::new(OrtexTensor::f64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const f64, &shape).to_owned(),
-        ))),
-        ("s", 8) => Ok(ResourceArc::new(OrtexTensor::s8(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i8, &shape).to_owned(),
-        ))),
-        ("s", 16) => Ok(ResourceArc::new(OrtexTensor::s16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i16, &shape).to_owned(),
-        ))),
-        ("s", 32) => Ok(ResourceArc::new(OrtexTensor::s32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i32, &shape).to_owned(),
-        ))),
-        ("s", 64) => Ok(ResourceArc::new(OrtexTensor::s64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i64, &shape).to_owned(),
-        ))),
-        ("u", 8) => Ok(ResourceArc::new(OrtexTensor::u8(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u8, &shape).to_owned(),
-        ))),
-        ("u", 16) => Ok(ResourceArc::new(OrtexTensor::u16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u16, &shape).to_owned(),
-        ))),
-        ("u", 32) => Ok(ResourceArc::new(OrtexTensor::u32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u32, &shape).to_owned(),
-        ))),
-        ("u", 64) => Ok(ResourceArc::new(OrtexTensor::u64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u64, &shape).to_owned(),
-        ))),
-        (&_, _) => unimplemented!(),
+) -> Result<ResourceArc<OrtexTensor>, ort::Error> {
+    let count = shape
+        .iter()
+        .try_fold(1usize, |n, d| n.checked_mul(*d))
+        .ok_or_else(|| ort::Error::new("tensor shape overflow"))?;
+    let bytes = dtype_bits
+        .checked_div(8)
+        .and_then(|size| count.checked_mul(size))
+        .ok_or_else(|| ort::Error::new("tensor byte size overflow"))?;
+    if bytes != bin.len() {
+        return Err(ort::Error::new(
+            "binary size does not match tensor shape and type",
+        ));
+    }
+    macro_rules! decode {
+        ($ty:ty, $variant:ident, $convert:expr) => {{
+            let data = bin
+                .as_slice()
+                .chunks_exact(std::mem::size_of::<$ty>())
+                .map(|chunk| {
+                    let v = <$ty>::from_ne_bytes(chunk.try_into().expect("fixed-size chunk"));
+                    ($convert)(v)
+                })
+                .collect();
+            let array = ArrayD::from_shape_vec(IxDyn(&shape), data)
+                .map_err(|e| ort::Error::new(e.to_string()))?;
+            Ok(ResourceArc::new(OrtexTensor::$variant(array)))
+        }};
+    }
+    match (dtype_str.as_str(), dtype_bits) {
+        ("bf", 16) => decode!(u16, bf16, half::bf16::from_bits),
+        ("f", 16) => decode!(u16, f16, half::f16::from_bits),
+        ("f", 32) => decode!(f32, f32, |v| v),
+        ("f", 64) => decode!(f64, f64, |v| v),
+        ("s", 8) => decode!(i8, s8, |v| v),
+        ("s", 16) => decode!(i16, s16, |v| v),
+        ("s", 32) => decode!(i32, s32, |v| v),
+        ("s", 64) => decode!(i64, s64, |v| v),
+        ("u", 8) => decode!(u8, u8, |v| v),
+        ("u", 16) => decode!(u16, u16, |v| v),
+        ("u", 32) => decode!(u32, u32, |v| v),
+        ("u", 64) => decode!(u64, u64, |v| v),
+        _ => Err(ort::Error::new("unsupported tensor type")),
     }
 }
 
@@ -91,18 +75,44 @@ pub fn to_binary<'a>(
 }
 
 /// Takes a vec of Atoms and transforms them into a vec of ExecutionProvider Enums
-pub fn map_eps(env: rustler::env::Env, eps: Vec<Atom>) -> Vec<ExecutionProviderDispatch> {
+pub fn map_eps(
+    env: rustler::env::Env,
+    eps: Vec<Atom>,
+    fail: bool,
+) -> Result<Vec<ExecutionProviderDispatch>, ort::Error> {
     eps.iter()
-        .map(|e| match &e.to_term(env).atom_to_string().unwrap()[..] {
-            CPU => ort::CPUExecutionProvider::default().build(),
-            CUDA => ort::CUDAExecutionProvider::default().build(),
-            TENSORRT => ort::TensorRTExecutionProvider::default().build(),
-            ACL => ort::ACLExecutionProvider::default().build(),
-            ONEDNN => ort::OneDNNExecutionProvider::default().build(),
-            COREML => ort::CoreMLExecutionProvider::default().build(),
-            DIRECTML => ort::DirectMLExecutionProvider::default().build(),
-            ROCM => ort::ROCmExecutionProvider::default().build(),
-            _ => ort::CPUExecutionProvider::default().build(),
+        .map(|e| {
+            let name = e
+                .to_term(env)
+                .atom_to_string()
+                .map_err(|_| ort::Error::new("invalid provider atom"))?;
+            let provider = match name.as_str() {
+                "cpu" => ort::ep::CPU::default().build(),
+                #[cfg(feature = "cuda")]
+                "cuda" => ort::ep::CUDA::default().build(),
+                #[cfg(feature = "tensorrt")]
+                "tensorrt" => ort::ep::TensorRT::default().build(),
+                #[cfg(feature = "coreml")]
+                "coreml" => ort::ep::CoreML::default().build(),
+                #[cfg(feature = "directml")]
+                "directml" => ort::ep::DirectML::default().build(),
+                #[cfg(feature = "acl")]
+                "acl" => ort::ep::ACL::default().build(),
+                #[cfg(feature = "onednn")]
+                "onednn" => ort::ep::OneDNN::default().build(),
+                #[cfg(feature = "rocm")]
+                "rocm" => ort::ep::ROCm::default().build(),
+                _ => {
+                    return Err(ort::Error::new(format!(
+                        "unknown or uncompiled execution provider: {name}"
+                    )))
+                }
+            };
+            Ok(if fail {
+                provider.error_on_failure()
+            } else {
+                provider
+            })
         })
         .collect()
 }
@@ -117,11 +127,11 @@ pub fn map_opt_level(opt: i32) -> GraphOptimizationLevel {
     }
 }
 
-pub fn is_bool_input(inp: &ort::ValueType) -> bool {
+pub fn is_bool_input(inp: &ort::value::ValueType) -> bool {
     match inp {
-        ort::ValueType::Tensor { ty, .. } => ty == &ort::TensorElementType::Bool,
-        ort::ValueType::Map { value, .. } => value == &ort::TensorElementType::Bool,
-        ort::ValueType::Sequence(boxed_input) => is_bool_input(boxed_input),
-        ort::ValueType::Optional(boxed_input) => is_bool_input(boxed_input),
+        ort::value::ValueType::Tensor { ty, .. } => ty == &ort::value::TensorElementType::Bool,
+        ort::value::ValueType::Map { value, .. } => value == &ort::value::TensorElementType::Bool,
+        ort::value::ValueType::Sequence(boxed_input) => is_bool_input(boxed_input),
+        ort::value::ValueType::Optional(boxed_input) => is_bool_input(boxed_input),
     }
 }

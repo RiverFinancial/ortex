@@ -31,3 +31,18 @@ keyword options after the upgrade. Use separate VMs to compare configurations.
 This characterizes repeated inference on our synthetic workload; upstream issue
 44's specific reproducer and a long-duration production-like soak remain separate
 investigations. Report measurements as observations, not performance guarantees.
+
+## After upgrade, same machine and runtime
+
+ort rc.15 / Rustler 0.38, API 17, CPU provider, graph optimization disabled,
+2,000 calls and concurrency eight:
+
+- Serial throughput: 120,388 calls/s; p50: 7 us; p99: 24 us.
+- Shared-model concurrent throughput: 69,730 calls/s, including mutex waiting.
+- RSS before: 110,755,840 bytes; five samples: 112,508,928; 112,689,152;
+  112,754,688; 112,771,072; 112,787,456 bytes.
+
+These single-run observations show no throughput regression on this fixture from
+serializing a shared session. They do not isolate the cause of the improvement:
+Rustler, ort, and binary conversion code all changed. Task scheduling dominates
+some of the concurrent measurements. No production performance claim follows.

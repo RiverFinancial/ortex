@@ -11,21 +11,30 @@ defmodule Ortex do
   of descending priority and graph optimization level 1-3. Any graph optimization level
   beyond the range of 1-3 will disable graph optimization.
 
-  By default, `Ortex` only includes some of the supported execution providers of ONNX Runtime.
-  To enable others, first ensure you have downloaded or compiled a version of
-  `libonnxruntime` that includes them, then set the environment variable `ORT_LIB_LOCATION`
-  to its location. Then add `config :ortex, Ortex.Native, features: [EXECUTION_PROVIDERS]` to your
-  `config.exs` where `EXECUTION_PROVIDERS` is a list of strings of which execution providers
-  to enable.
+  The keyword form accepts `providers`, `optimization_level` (0-3),
+  `intra_threads`, `inter_threads`, `parallel_execution`, `intra_op_spinning`,
+  `inter_op_spinning`, `independent_thread_pool`, `environment`, `profiling`,
+  `optimized_model_path`, `deterministic_compute`, `memory_pattern`, and `log_id`.
+  Thread counts are non-negative integers; zero leaves selection to the runtime.
+  See `Ortex.Environment` for shared global pools.
+
+  Precompiled NIFs support CPU execution with ONNX Runtime 1.17 or newer, loaded
+  from `ORT_DYLIB_PATH` or the system library path. Accelerator providers require
+  a source build with their Cargo features and a matching runtime library.
+  Unknown or uncompiled providers raise. The keyword form also fails on provider
+  registration errors by default (`error_on_failure: false` opts into fallback).
+  Positional arities retain their legacy optimization and registration behavior.
 
   ## Examples
 
       iex> Ortex.load("./models/tinymodel.onnx")
-      iex> Ortex.load("./models/tinymodel.onnx", [:cuda, :cpu])
+      iex> Ortex.load("./models/tinymodel.onnx", intra_threads: 1, intra_op_spinning: false)
       iex> Ortex.load("./models/tinymodel.onnx", [:cpu], 0)
 
   """
-  defdelegate load(path, eps \\ [:cpu], opt \\ 3), to: Ortex.Model
+  defdelegate load(path), to: Ortex.Model
+  defdelegate load(path, options_or_providers), to: Ortex.Model
+  defdelegate load(path, providers, optimization_level), to: Ortex.Model
 
   @doc """
   Run a forward pass through a model.

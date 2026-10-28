@@ -9,22 +9,20 @@ mod model;
 mod tensor;
 mod utils;
 
-use model::OrtexModel;
 use tensor::OrtexTensor;
 
-use rustler::resource::ResourceArc;
 use rustler::types::Binary;
+use rustler::ResourceArc;
 use rustler::{Atom, Env, NifResult, Term};
 
 #[rustler::nif(schedule = "DirtyIo")]
-fn init(
+fn init_with_options(
     env: Env,
     model_path: String,
-    eps: Vec<Atom>,
-    opt: i32,
+    environment: ResourceArc<model::OrtexEnvironment>,
+    options: model::SessionOptions,
 ) -> NifResult<ResourceArc<model::OrtexModel>> {
-    let eps = utils::map_eps(env, eps);
-    let model = model::init(model_path, eps, opt)
+    let model = model::init(env, model_path, environment, options)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))?;
     Ok(ResourceArc::new(model))
 }
@@ -71,7 +69,7 @@ fn to_binary<'a>(
 }
 
 #[rustler::nif]
-pub fn slice<'a>(
+pub fn slice(
     tensor: ResourceArc<OrtexTensor>,
     start_indicies: Vec<isize>,
     lengths: Vec<isize>,
@@ -85,7 +83,7 @@ pub fn slice<'a>(
 }
 
 #[rustler::nif]
-pub fn reshape<'a>(
+pub fn reshape(
     tensor: ResourceArc<OrtexTensor>,
     shape: Vec<usize>,
 ) -> NifResult<ResourceArc<OrtexTensor>> {
@@ -93,7 +91,7 @@ pub fn reshape<'a>(
 }
 
 #[rustler::nif]
-pub fn concatenate<'a>(
+pub fn concatenate(
     tensors: Vec<ResourceArc<OrtexTensor>>,
     dtype: Term,
     axis: i32,
@@ -104,21 +102,13 @@ pub fn concatenate<'a>(
     Ok(ResourceArc::new(concatted))
 }
 
-rustler::init!(
-    "Elixir.Ortex.Native",
-    [
-        run,
-        init,
-        from_binary,
-        to_binary,
-        show_session,
-        slice,
-        reshape,
-        concatenate
-    ],
-    load = |env: Env, _| {
-        rustler::resource!(OrtexModel, env);
-        rustler::resource!(OrtexTensor, env);
-        true
-    }
-);
+#[rustler::nif(schedule = "DirtyIo")]
+fn environment(
+    options: Option<model::PoolOptions>,
+) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
+    model::environment(options)
+        .map(ResourceArc::new)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+rustler::init!("Elixir.Ortex.Native");

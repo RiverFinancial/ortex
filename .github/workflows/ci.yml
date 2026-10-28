@@ -1,49 +1,64 @@
-name: Test
+name: Source validation
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    name: Linux ${{ matrix.elixir }}, ${{ matrix.otp }}
+  source:
+    name: API ${{ matrix.api }} / runtime ${{ matrix.runtime }}
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
-        elixir: ["1.17.3"]
-        otp: ["27.1.2"]
+        include:
+          - {api: 17, runtime: '1.17.3', elixir: '1.16.3', otp: '26.2.5.15'}
+          - {api: 17, runtime: '1.24.4', elixir: '1.20.4', otp: '29.1.1'}
+          - {api: 24, runtime: '1.24.4', elixir: '1.20.4', otp: '29.1.1'}
     env:
       MIX_ENV: test
+      ORTEX_BUILD: 'true'
     steps:
-      - uses: actions/checkout@v2
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
-          otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
-
-  macos:
-    runs-on: macos-latest
-    name: macOS
-    env:
-      MIX_ENV: test
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install
+          otp-version: ${{ matrix.otp }}
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install Rust
+        run: rustup toolchain install 1.93.1 --profile minimal --component rustfmt
+      - name: Install test runtime
+        run: python scripts/install_runtime.py '${{ matrix.runtime }}'
+      - run: mix deps.get --check-locked
+      - run: mix format --check-formatted
+      - run: cargo +1.93.1 fmt --manifest-path native/ortex/Cargo.toml --check
+      - name: Select API floor
+        env:
+          API: ${{ matrix.api }}
         run: |
-          brew update
-          brew install erlang@27 elixir
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
+          echo 'import Config' > config/ci.exs
+          echo "config :ortex, Ortex.Native, features: [\"load-dynamic\", \"api-${API}\"]" >> config/ci.exs
+          echo 'import_config "ci.exs"' >> config/config.exs
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+      - run: mix run --no-start scripts/check_global_pool.exs
+      - name: Verify recoverable runtime loading errors
+        run: ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_missing_runtime.exs
+      - name: Record diagnostic benchmark
+        run: mix run bench/inference.exs 2000 8
+  alpine:
+    name: Alpine / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: docker build --progress=plain -f Dockerfile.alpine -t ortex-alpine .
+      - run: docker run --rm ortex-alpine

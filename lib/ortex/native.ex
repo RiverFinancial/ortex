@@ -1,32 +1,34 @@
 defmodule Ortex.Native do
   @moduledoc false
 
-  @rustler_version Application.spec(:rustler, :vsn) |> to_string() |> Version.parse!()
+  version = Mix.Project.config()[:version]
+  config = Application.compile_env(:ortex, __MODULE__, [])
+  features = Keyword.get(config, :features, ["load-dynamic", "api-17"])
 
-  # We have to compile the crate before `use Rustler` compiles the crate since
-  # cargo downloads the onnxruntime shared libraries and they are not available
-  # to load or copy into Elixir's during the on_load or Elixir compile steps.
-  # In the future, this may be configurable in Rustler.
-  if Version.compare(@rustler_version, "0.30.0") in [:gt, :eq] do
-    Rustler.Compiler.compile_crate(:ortex, Application.compile_env(:ortex, __MODULE__, []),
-      otp_app: :ortex,
-      crate: :ortex
-    )
-  else
-    Rustler.Compiler.compile_crate(__MODULE__, otp_app: :ortex, crate: :ortex)
-  end
-
-  Ortex.Util.copy_ort_libs()
-
-  use Rustler,
+  use RustlerPrecompiled,
     otp_app: :ortex,
     crate: :ortex,
-    skip_compilation?: true
+    version: version,
+    base_url: "https://github.com/RiverFinancial/ortex/releases/download/v#{version}",
+    targets:
+      ~w(aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-pc-windows-msvc),
+    nif_versions: ["2.16"],
+    features: features,
+    default_features: false,
+    force_build:
+      System.get_env("ORTEX_BUILD") in ["1", "true"] or
+        features != ["load-dynamic", "api-17"]
 
   # When loading a NIF module, dummy clauses for all NIF function are required.
   # NIF dummies usually just error out when called when the NIF is not loaded, as that should never normally happen.
-  def init(_model_path, _execution_providers, _optimization_level),
-    do: :erlang.nif_error(:nif_not_loaded)
+  # Compatibility wrapper for consumers that called this internal entry point.
+  def init(path, providers, optimization) do
+    {_, options} = Ortex.Options.legacy!(providers, optimization)
+    init_with_options(path, Ortex.Environment.get().reference, options)
+  end
+
+  def init_with_options(_path, _environment, _options), do: :erlang.nif_error(:nif_not_loaded)
+  def environment(_global_thread_pool), do: :erlang.nif_error(:nif_not_loaded)
 
   def run(_model, _inputs), do: :erlang.nif_error(:nif_not_loaded)
   def from_binary(_bin, _shape, _type), do: :erlang.nif_error(:nif_not_loaded)
