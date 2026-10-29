@@ -2,7 +2,7 @@
 use crate::tensor::OrtexTensor;
 use crate::utils::{is_bool_input, map_eps, map_opt_level};
 use ort::environment::{Environment, GlobalThreadPoolOptions};
-use ort::session::{Session, SessionInputValue};
+use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
 use ort::value::ValueType;
 use ort::Error;
 use rustler::{Atom, Env, NifMap, Resource, ResourceArc};
@@ -99,12 +99,11 @@ pub struct SessionOptions {
     log_id: Option<String>,
 }
 
-pub fn init(
+fn session_builder(
     env: Env,
-    path: String,
     environment: ResourceArc<OrtexEnvironment>,
     opts: SessionOptions,
-) -> Result<OrtexModel, Error> {
+) -> Result<SessionBuilder, Error> {
     if environment.global_pool
         && !opts.independent_thread_pool
         && (opts.intra_threads.is_some()
@@ -151,7 +150,32 @@ pub fn init(
     if let Some(v) = opts.log_id {
         builder = builder.with_log_id(v)?;
     }
-    let session = builder.commit_from_file(path)?;
+    Ok(builder)
+}
+
+pub fn init(
+    env: Env,
+    path: String,
+    environment: ResourceArc<OrtexEnvironment>,
+    opts: SessionOptions,
+) -> Result<OrtexModel, Error> {
+    let mut builder = session_builder(env, environment, opts)?;
+    Ok(from_session(builder.commit_from_file(path)?))
+}
+
+pub fn init_from_memory(
+    env: Env,
+    bytes: &[u8],
+    environment: ResourceArc<OrtexEnvironment>,
+    opts: SessionOptions,
+) -> Result<OrtexModel, Error> {
+    let mut builder = session_builder(env, environment, opts)?;
+    // The copying constructor owns the graph after this call; it does not retain
+    // a borrow into the caller's BEAM binary.
+    Ok(from_session(builder.commit_from_memory(bytes)?))
+}
+
+fn from_session(session: Session) -> OrtexModel {
     let describe = |outlets: &[ort::value::Outlet]| {
         outlets
             .iter()
@@ -164,11 +188,11 @@ pub fn init(
             })
             .collect()
     };
-    Ok(OrtexModel {
+    OrtexModel {
         inputs: describe(session.inputs()),
         outputs: describe(session.outputs()),
         session: Mutex::new(session),
-    })
+    }
 }
 
 pub fn show(model: ResourceArc<OrtexModel>) -> (Description, Description) {

@@ -28,6 +28,7 @@ defmodule Ortex.Native do
   end
 
   def init_with_options(_path, _environment, _options), do: :erlang.nif_error(:nif_not_loaded)
+  def init_from_memory(_bytes, _environment, _options), do: :erlang.nif_error(:nif_not_loaded)
   def environment(_global_thread_pool), do: :erlang.nif_error(:nif_not_loaded)
 
   def run(_model, _inputs), do: :erlang.nif_error(:nif_not_loaded)

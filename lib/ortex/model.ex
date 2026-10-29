@@ -38,17 +38,20 @@ defmodule Ortex.Model do
     load_with_options(path, environment, options)
   end
 
+  @doc false
+  def load_from_memory(bytes, opts \\ []) when is_binary(bytes) do
+    {environment, options} = Ortex.Options.validate!(opts)
+    environment = environment || Ortex.Environment.get()
+    Ortex.Native.init_from_memory(bytes, environment.reference, options) |> to_model()
+  end
+
   defp load_with_options(path, environment, options) when is_binary(path) do
     environment = environment || Ortex.Environment.get()
-
-    case Ortex.Native.init_with_options(path, environment.reference, options) do
-      {:error, msg} ->
-        raise msg
-
-      model ->
-        %Ortex.Model{reference: model}
-    end
+    Ortex.Native.init_with_options(path, environment.reference, options) |> to_model()
   end
+
+  defp to_model({:error, message}), do: raise(message)
+  defp to_model(reference), do: %Ortex.Model{reference: reference}
 
   @doc false
   def run(%Ortex.Model{} = model, tensor) when not is_tuple(tensor) do
