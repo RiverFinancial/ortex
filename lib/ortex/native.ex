@@ -40,6 +40,7 @@ defmodule Ortex.Native do
   def new_run_control(_model, _options), do: :erlang.nif_error(:nif_not_loaded)
   def cancel_run(_control), do: :erlang.nif_error(:nif_not_loaded)
   def run_started(_control), do: :erlang.nif_error(:nif_not_loaded)
+  def reserve_run(_model, _control), do: :erlang.nif_error(:nif_not_loaded)
   def inference_scheduler, do: :erlang.nif_error(:nif_not_loaded)
   def run_controlled(_model, _inputs, _control), do: :erlang.nif_error(:nif_not_loaded)
   def run_named_controlled(_model, _inputs, _control), do: :erlang.nif_error(:nif_not_loaded)

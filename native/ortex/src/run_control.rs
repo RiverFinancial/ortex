@@ -3,7 +3,7 @@ use crate::model::{self, InferenceOptions, OrtexModel};
 use ort::session::{HasSelectedOutputs, OutputSelector, RunOptions};
 use ort::Error;
 use rustler::{Resource, ResourceArc};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct PreparedRun {
     names: Vec<String>,
@@ -58,11 +58,11 @@ impl PreparedRun {
 pub struct RunControl {
     model: ResourceArc<OrtexModel>,
     prepared: PreparedRun,
-    claimed: AtomicBool,
+    state: AtomicU8,
 }
 // Encoding only copies the opaque resource handle; it cannot mutate run options.
 impl std::panic::RefUnwindSafe for RunControl {}
-#[rustler::resource_impl(name = "OrtexRunControlV1")]
+#[rustler::resource_impl(name = "OrtexRunControlV2")]
 impl Resource for RunControl {}
 
 impl RunControl {
@@ -71,15 +71,36 @@ impl RunControl {
         Ok(Self {
             model,
             prepared,
-            claimed: AtomicBool::new(false),
+            state: AtomicU8::new(0),
         })
     }
-    pub fn claim(&self, model: &OrtexModel) -> Result<(), Error> {
+    fn check_model(&self, model: &OrtexModel) -> Result<(), Error> {
         if !std::ptr::eq(&*self.model, model) {
             return Err(Error::new("run control belongs to another model"));
         }
-        self.claimed
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        Ok(())
+    }
+    // Reserve ownership before spawning a worker or installing its deadline.
+    // A rejected duplicate must never acquire authority to cancel another call.
+    pub fn reserve(&self, model: &OrtexModel) -> Result<(), Error> {
+        self.check_model(model)?;
+        self.state
+            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| Error::new("run control has already been used"))?;
+        Ok(())
+    }
+    pub fn claim(&self, model: &OrtexModel) -> Result<(), Error> {
+        self.check_model(model)?;
+        // Direct internal NIF calls can enter from ready (0); public managed
+        // calls enter from reserved (1). Neither can execute twice (2).
+        self.state
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+                if state < 2 {
+                    Some(2)
+                } else {
+                    None
+                }
+            })
             .map_err(|_| Error::new("run control has already been used"))?;
         Ok(())
     }
@@ -90,6 +111,6 @@ impl RunControl {
         self.prepared.options.terminate()
     }
     pub fn started(&self) -> bool {
-        self.claimed.load(Ordering::Acquire)
+        self.state.load(Ordering::Acquire) == 2
     }
 }
