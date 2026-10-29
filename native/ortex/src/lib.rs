@@ -8,6 +8,7 @@ mod constants;
 mod metadata;
 mod model;
 mod providers;
+mod run_control;
 mod runtime_logs;
 mod tensor;
 mod utils;
@@ -226,6 +227,54 @@ fn take_runtime_logs(
 }
 
 rustler::init!("Elixir.Ortex.Native");
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn new_run_control(
+    model: ResourceArc<model::OrtexModel>,
+    options: model::InferenceOptions,
+) -> NifResult<ResourceArc<run_control::RunControl>> {
+    run_control::RunControl::new(model, options)
+        .map(ResourceArc::new)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+// Runtime termination only sets a flag; it must not queue behind inference NIFs
+// waiting for a session mutex on the dirty scheduler pool.
+#[rustler::nif]
+fn cancel_run(control: ResourceArc<run_control::RunControl>) -> NifResult<Atom> {
+    control
+        .cancel()
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))?;
+    Ok(rustler::types::atom::ok())
+}
+
+#[rustler::nif]
+fn run_started(control: ResourceArc<run_control::RunControl>) -> bool {
+    control.started()
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn run_controlled<'a>(
+    env: Env<'a>,
+    model: ResourceArc<model::OrtexModel>,
+    inputs: Vec<values::InputValue>,
+    control: ResourceArc<run_control::RunControl>,
+) -> NifResult<Vec<Term<'a>>> {
+    model::infer_controlled_positional(model, inputs, &control, |v| values::decode(env, v))
+        .map(|outputs| outputs.into_iter().map(|(_, v)| v).collect())
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn run_named_controlled<'a>(
+    env: Env<'a>,
+    model: ResourceArc<model::OrtexModel>,
+    inputs: Vec<(String, values::InputValue)>,
+    control: ResourceArc<run_control::RunControl>,
+) -> NifResult<Vec<(String, Term<'a>)>> {
+    model::infer_controlled(model, inputs, &control, |v| values::decode(env, v))
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn environment_with_options(

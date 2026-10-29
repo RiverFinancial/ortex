@@ -98,7 +98,12 @@ defmodule Ortex.Model do
                 "named inputs must map binary names to Nx tensors or Ortex.StringTensor values"
       end)
 
-    case Ortex.Native.run_named_values(reference, inputs, opts) do
+    result =
+      if opts.control,
+        do: Ortex.Native.run_named_controlled(reference, inputs, opts.control.reference),
+        else: Ortex.Native.run_named_values(reference, inputs, opts)
+
+    case result do
       {:error, message} -> raise message
       outputs -> Map.new(outputs, fn {name, tensor} -> {name, output_tensor(tensor)} end)
     end
@@ -111,11 +116,9 @@ defmodule Ortex.Model do
   defp run_validated(%Ortex.Model{reference: model}, tensors, opts) do
     # Move tensors into Ortex backend and pass the reference to the Ortex NIF
     output =
-      case Ortex.Native.run_values(
+      case native_positional_run(
              model,
-             tensors
-             |> Tuple.to_list()
-             |> Enum.map(&input_reference/1),
+             tensors |> Tuple.to_list() |> Enum.map(&input_reference/1),
              opts
            ) do
         {:error, msg} -> raise msg
@@ -127,6 +130,12 @@ defmodule Ortex.Model do
     |> Enum.map(&output_tensor/1)
     |> List.to_tuple()
   end
+
+  defp native_positional_run(model, inputs, %{control: %Ortex.RunControl{reference: control}}),
+    do: Ortex.Native.run_controlled(model, inputs, control)
+
+  defp native_positional_run(model, inputs, opts),
+    do: Ortex.Native.run_values(model, inputs, opts)
 
   defp input_reference(%Nx.Tensor{} = tensor) do
     %Nx.Tensor{data: %Ortex.Backend{ref: reference}} = Nx.backend_transfer(tensor, Ortex.Backend)
