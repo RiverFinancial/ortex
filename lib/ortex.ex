@@ -36,6 +36,16 @@ defmodule Ortex do
   defdelegate load(path, providers, optimization_level), to: Ortex.Model
 
   @doc """
+  Loads an ONNX model directly from a binary using the same keyword options as
+  `load/2`. The copying constructor owns the model after loading; the caller may
+  discard the binary. Models referencing external tensor-data files should be
+  loaded from disk with their external files available.
+
+      model = Ortex.load_from_memory(File.read!("model.onnx"), intra_threads: 1)
+  """
+  defdelegate load_from_memory(bytes, opts \\ []), to: Ortex.Model
+
+  @doc """
   Run a forward pass through a model.
 
   This takes a model and tuple of `Nx.Tensors`,

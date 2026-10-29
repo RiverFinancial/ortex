@@ -27,6 +27,18 @@ fn init_with_options(
     Ok(ResourceArc::new(model))
 }
 
+#[rustler::nif(schedule = "DirtyIo")]
+fn init_from_memory(
+    env: Env,
+    bytes: Binary,
+    environment: ResourceArc<model::OrtexEnvironment>,
+    options: model::SessionOptions,
+) -> NifResult<ResourceArc<model::OrtexModel>> {
+    model::init_from_memory(env, bytes.as_slice(), environment, options)
+        .map(ResourceArc::new)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
 #[rustler::nif]
 fn show_session(
     model: ResourceArc<model::OrtexModel>,

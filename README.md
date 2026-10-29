@@ -109,6 +109,17 @@ Global-pool sessions reject local thread-count/spinning options unless
 `independent_thread_pool: true` is also supplied. Environment configuration is
 fixed for the VM lifetime. See `Ortex.Environment` and `Ortex.load/2` for options.
 
+## Loading model bytes
+
+```elixir
+model = Ortex.load_from_memory(onnx_bytes, intra_threads: 1)
+```
+
+Memory loading uses the same validated keyword options and requires no temporary
+file. The runtime owns the graph after loading, so the source binary may be
+released. Models with external tensor-data files still need file loading with
+those files available. `Ortex.load/1` continues to interpret binaries as paths.
+
 ## Fork release automation
 
 The release matrix builds and tests all seven targets without installing ONNX
