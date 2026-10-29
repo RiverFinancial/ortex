@@ -5,7 +5,7 @@ use ort::environment::Environment;
 use ort::session::{Session, SessionInputValue};
 use ort::value::ValueType;
 use ort::Error;
-use rustler::{Atom, Env, Resource, ResourceArc};
+use rustler::{Atom, Env, NifMap, Resource, ResourceArc};
 use std::sync::Mutex;
 
 pub type Description = Vec<(String, String, Option<Vec<i64>>)>;
@@ -59,17 +59,67 @@ pub fn environment() -> Result<OrtexEnvironment, String> {
     .map_err(|e| e.to_string())
 }
 
+#[derive(NifMap)]
+pub struct SessionOptions {
+    providers: Vec<Atom>,
+    optimization_level: i32,
+    error_on_failure: bool,
+    intra_threads: Option<usize>,
+    inter_threads: Option<usize>,
+    parallel_execution: Option<bool>,
+    intra_op_spinning: Option<bool>,
+    inter_op_spinning: Option<bool>,
+    independent_thread_pool: bool,
+    profiling: Option<String>,
+    optimized_model_path: Option<String>,
+    deterministic_compute: Option<bool>,
+    memory_pattern: Option<bool>,
+    log_id: Option<String>,
+}
+
 pub fn init(
     env: Env,
     path: String,
     environment: ResourceArc<OrtexEnvironment>,
-    providers: Vec<Atom>,
-    optimization: i32,
+    opts: SessionOptions,
 ) -> Result<OrtexModel, Error> {
-    let providers = map_eps(env, providers, false)?;
+    let providers = map_eps(env, opts.providers, opts.error_on_failure)?;
     let mut builder = Session::builder(&environment.environment)?
-        .with_optimization_level(map_opt_level(optimization))?
+        .with_optimization_level(map_opt_level(opts.optimization_level))?
         .with_execution_providers(providers)?;
+    if opts.independent_thread_pool {
+        builder = builder.with_independent_thread_pool()?;
+    }
+    if let Some(n) = opts.intra_threads {
+        builder = builder.with_intra_threads(n)?;
+    }
+    if let Some(n) = opts.inter_threads {
+        builder = builder.with_inter_threads(n)?;
+    }
+    if let Some(v) = opts.parallel_execution {
+        builder = builder.with_parallel_execution(v)?;
+    }
+    if let Some(v) = opts.intra_op_spinning {
+        builder = builder.with_intra_op_spinning(v)?;
+    }
+    if let Some(v) = opts.inter_op_spinning {
+        builder = builder.with_inter_op_spinning(v)?;
+    }
+    if let Some(v) = opts.profiling {
+        builder = builder.with_profiling(v)?;
+    }
+    if let Some(v) = opts.optimized_model_path {
+        builder = builder.with_optimized_model_path(v)?;
+    }
+    if let Some(v) = opts.deterministic_compute {
+        builder = builder.with_deterministic_compute(v)?;
+    }
+    if let Some(v) = opts.memory_pattern {
+        builder = builder.with_memory_pattern(v)?;
+    }
+    if let Some(v) = opts.log_id {
+        builder = builder.with_log_id(v)?;
+    }
     let session = builder.commit_from_file(path)?;
     let describe = |outlets: &[ort::value::Outlet]| {
         outlets

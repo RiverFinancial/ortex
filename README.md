@@ -62,3 +62,24 @@ end
 ```
 
 You will need [Rust](https://www.rust-lang.org/tools/install) for compilation to succeed.
+
+## Session options and concurrency
+
+```elixir
+model = Ortex.load("model.onnx",
+  providers: [:cpu], optimization_level: 3,
+  intra_threads: 1, inter_threads: 1,
+  intra_op_spinning: false, inter_op_spinning: false
+)
+```
+
+Old positional load arities and tuple-based inference outputs remain available.
+New keyword options reject duplicates, unknown keys, and invalid values. Unknown
+or uncompiled providers raise instead of becoming CPU. Keyword calls fail on
+provider registration errors unless `error_on_failure: false` is specified;
+legacy calls retain runtime registration fallback behavior.
+
+Calls sharing a model are serialized through a native mutex; separate model
+sessions may run concurrently. This follows ort's mutable-session requirement.
+See [the concurrency ADR](docs/adr-001-session-concurrency.md) and
+[the baseline measurements](docs/baseline.md).

@@ -1,0 +1,67 @@
+defmodule Ortex.Options do
+  @moduledoc false
+  @defaults %{
+    providers: [:cpu],
+    optimization_level: 3,
+    error_on_failure: true,
+    intra_threads: nil,
+    inter_threads: nil,
+    parallel_execution: nil,
+    intra_op_spinning: nil,
+    inter_op_spinning: nil,
+    independent_thread_pool: false,
+    profiling: nil,
+    optimized_model_path: nil,
+    deterministic_compute: nil,
+    memory_pattern: nil,
+    log_id: nil
+  }
+
+  def validate!(opts) do
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "expected a keyword list")
+    keys = Keyword.keys(opts)
+    unknown = keys -- [:environment | Map.keys(@defaults)]
+    if unknown != [], do: raise(ArgumentError, "unknown Ortex options: #{inspect(unknown)}")
+
+    if length(keys) != length(Enum.uniq(keys)),
+      do: raise(ArgumentError, "duplicate Ortex options")
+
+    {environment, opts} = Keyword.pop(opts, :environment)
+
+    for {key, value} <- opts do
+      valid =
+        case key do
+          :providers ->
+            is_list(value) and Enum.all?(value, &is_atom/1)
+
+          :optimization_level ->
+            is_integer(value) and value in 0..3
+
+          key when key in [:intra_threads, :inter_threads] ->
+            is_integer(value) and value >= 0 and value <= 2_147_483_647
+
+          key when key in [:profiling, :optimized_model_path, :log_id] ->
+            is_binary(value) and not String.contains?(value, <<0>>)
+
+          _ ->
+            is_boolean(value)
+        end
+
+      unless valid,
+        do: raise(ArgumentError, "invalid Ortex option #{inspect(key)}: #{inspect(value)}")
+    end
+
+    if environment != nil and not is_struct(environment, Ortex.Environment),
+      do: raise(ArgumentError, "environment must be an Ortex.Environment handle")
+
+    {environment, Map.merge(@defaults, Map.new(opts))}
+  end
+
+  def legacy!(providers, optimization) when is_list(providers) and is_integer(optimization) do
+    validate!(
+      providers: providers,
+      optimization_level: if(optimization in 1..3, do: optimization, else: 0),
+      error_on_failure: false
+    )
+  end
+end
