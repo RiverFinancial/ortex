@@ -71,8 +71,15 @@ defmodule Ortex.Model do
        when is_map(inputs) and not is_struct(inputs) do
     inputs =
       Enum.map(inputs, fn
-        {name, %Nx.Tensor{} = tensor} when is_binary(name) -> {name, input_reference(tensor)}
-        _ -> raise ArgumentError, "named inputs must map binary names to Nx tensors"
+        {name, %Nx.Tensor{} = tensor} when is_binary(name) ->
+          {name, input_reference(tensor)}
+
+        {name, %Ortex.StringTensor{} = tensor} when is_binary(name) ->
+          {name, input_reference(tensor)}
+
+        _ ->
+          raise ArgumentError,
+                "named inputs must map binary names to Nx tensors or Ortex.StringTensor values"
       end)
 
     case Ortex.Native.run_named_values(reference, inputs, opts) do
@@ -110,6 +117,11 @@ defmodule Ortex.Model do
     reference
   end
 
+  defp input_reference(%Ortex.StringTensor{data: data, shape: shape}) do
+    Ortex.StringTensor.new(data, shape)
+    {Tuple.to_list(shape), data}
+  end
+
   defp output_tensor({ref, shape, dtype_atom, dtype_bits}) do
     %Nx.Tensor{
       data: %Ortex.Backend{ref: ref},
@@ -122,6 +134,9 @@ defmodule Ortex.Model do
   defp output_tensor({:tensor, descriptor}), do: output_tensor(descriptor)
   defp output_tensor({:sequence, values}), do: Enum.map(values, &output_tensor/1)
   defp output_tensor({:map, values}), do: values
+
+  defp output_tensor({:string_tensor, shape, data}),
+    do: %Ortex.StringTensor{shape: List.to_tuple(shape), data: data}
 end
 
 defimpl Inspect, for: Ortex.Model do
