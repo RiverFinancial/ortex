@@ -9,6 +9,7 @@ pub mod ortex_atoms {
         s, u, f, bf, c,
         // Execution provider atoms
         cpu, cuda, tensorrt, acl, dnnl,
-        onednn, coreml, directml, rocm
+        onednn, coreml, directml, rocm,
+        dirty_cpu, dirty_io
     }
 }

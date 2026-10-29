@@ -76,7 +76,11 @@ fn show_session(
     Ok(model::show(model))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run(
     model: ResourceArc<model::OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
@@ -84,7 +88,11 @@ fn run(
     model::run(model, inputs).map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_named(
     model: ResourceArc<model::OrtexModel>,
     inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
@@ -92,7 +100,11 @@ fn run_named(
     model::run_named(model, inputs).map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_with_options(
     model: ResourceArc<model::OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
@@ -102,7 +114,11 @@ fn run_with_options(
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_named_with_options(
     model: ResourceArc<model::OrtexModel>,
     inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
@@ -112,7 +128,11 @@ fn run_named_with_options(
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_values<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
@@ -126,7 +146,11 @@ fn run_values<'a>(
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_named_values<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
@@ -254,7 +278,11 @@ fn run_started(control: ResourceArc<run_control::RunControl>) -> bool {
     control.started()
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_controlled<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
@@ -266,7 +294,11 @@ fn run_controlled<'a>(
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(schedule = "DirtyIo")]
+#[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
+#[cfg_attr(
+    not(feature = "benchmark-dirty-cpu"),
+    rustler::nif(schedule = "DirtyIo")
+)]
 fn run_named_controlled<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
@@ -285,4 +317,13 @@ fn environment_with_options(
     model::environment(env, options)
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e)))
+}
+
+#[rustler::nif]
+fn inference_scheduler() -> Atom {
+    if cfg!(feature = "benchmark-dirty-cpu") {
+        constants::ortex_atoms::dirty_cpu()
+    } else {
+        constants::ortex_atoms::dirty_io()
+    }
 }

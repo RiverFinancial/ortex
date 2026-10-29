@@ -8,3 +8,8 @@ config :ortex,
 
 # CPU-only by default. Accelerator features require an explicit source build and
 # a matching ONNX Runtime library; never infer GPU support from the host OS.
+
+# Test-only source-build diagnostic, separate from distributed precompiled NIFs.
+if config_env() == :test and System.get_env("ORTEX_BENCHMARK_DIRTY_CPU") == "1" do
+  config :ortex, Ortex.Native, features: ["load-dynamic", "api-17", "benchmark-dirty-cpu"]
+end

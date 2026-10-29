@@ -42,9 +42,9 @@ jobs:
       - run: mix deps.get --check-locked
       - run: mix format --check-formatted
       - run: cargo +1.93.1 fmt --manifest-path native/ortex/Cargo.toml --check
-      - name: Check provider feature mappings
+      - name: Check optional native feature mappings
         if: matrix.api == 17 && matrix.runtime == '1.24.4'
-        run: cargo +1.93.1 check --locked --manifest-path native/ortex/Cargo.toml --features coreml,cuda,tensorrt,directml,acl,onednn,rocm
+        run: cargo +1.93.1 check --locked --manifest-path native/ortex/Cargo.toml --features coreml,cuda,tensorrt,directml,acl,onednn,rocm,benchmark-dirty-cpu
       - name: Select API floor
         env:
           API: ${{ matrix.api }}
