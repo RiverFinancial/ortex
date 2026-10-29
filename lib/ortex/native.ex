@@ -1,13 +1,27 @@
 defmodule Ortex.Native do
   @moduledoc false
-  config = Application.compile_env(:ortex, __MODULE__, [])
 
-  use Rustler,
+  version = Mix.Project.config()[:version]
+  config = Application.compile_env(:ortex, __MODULE__, [])
+  features = Keyword.get(config, :features, ["load-dynamic", "api-17"])
+
+  use RustlerPrecompiled,
     otp_app: :ortex,
     crate: :ortex,
+    version: version,
+    base_url: "https://github.com/RiverFinancial/ortex/releases/download/v#{version}",
+    targets:
+      ~w(aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-pc-windows-msvc),
+    nif_versions: ["2.16"],
+    features: features,
     default_features: false,
-    features: Keyword.get(config, :features, ["load-dynamic", "api-17"])
+    force_build:
+      System.get_env("ORTEX_BUILD") in ["1", "true"] or
+        features != ["load-dynamic", "api-17"]
 
+  # When loading a NIF module, dummy clauses for all NIF function are required.
+  # NIF dummies usually just error out when called when the NIF is not loaded, as that should never normally happen.
+  # Compatibility wrapper for consumers that called this internal entry point.
   def init(path, providers, optimization) do
     {_, options} = Ortex.Options.legacy!(providers, optimization)
     init_with_options(path, Ortex.Environment.get().reference, options)

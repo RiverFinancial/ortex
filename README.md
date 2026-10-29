@@ -49,19 +49,33 @@ iex> result |> Nx.backend_transfer() |> Nx.argmax(axis: 1)
 >
 ```
 
-## Installation
+## Installation in River's fork
 
-`Ortex` can be installed by adding `ortex` to your list of dependencies in `mix.exs`:
+Pin a reviewed commit from `RiverFinancial/ortex` in your dependencies:
 
 ```elixir
-def deps do
-  [
-    {:ortex, "~> 0.1.10"}
-  ]
-end
+{:ortex, github: "RiverFinancial/ortex", ref: "<reviewed-commit-sha>"}
 ```
 
-You will need [Rust](https://www.rust-lang.org/tools/install) for compilation to succeed.
+Until the matching fork release assets exist, set `ORTEX_BUILD=true` and add
+`{:rustler, "~> 0.38.0"}` to your application dependencies to build from source.
+Source builds require Rust >= 1.92 and Elixir >= 1.16.
+
+The precompiled CPU NIF targets Linux x86_64/aarch64 with glibc or musl,
+both macOS architectures, and Windows x86_64 MSVC. It contains no ONNX Runtime
+library: set `ORT_DYLIB_PATH` before startup to the library installed on your
+machine. For Alpine runtime 1.24.4, use `/usr/lib/libonnxruntime.so.1.24.4`.
+
+API 17 is the default floor; it is tested against runtime 1.17.3 and 1.24.4.
+Custom Cargo features automatically select a source build. Include both a
+linking strategy and an API floor in the replacement feature list:
+
+```elixir
+config :ortex, Ortex.Native, features: ["load-dynamic", "api-24", "coreml"]
+```
+
+See [the precompiled contract](docs/precompiled.md) for NIF ABI, checksum,
+runtime compatibility, and local verification details.
 
 ## Session options and concurrency
 
