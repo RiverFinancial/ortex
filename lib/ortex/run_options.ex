@@ -6,7 +6,7 @@ defmodule Ortex.RunOptions do
       do: raise(ArgumentError, "expected a keyword list of run options")
 
     keys = Keyword.keys(opts)
-    unknown = keys -- [:outputs, :tag, :control]
+    unknown = keys -- [:outputs, :tag, :control, :timeout]
     if unknown != [], do: raise(ArgumentError, "unknown Ortex run options: #{inspect(unknown)}")
 
     if length(keys) != length(Enum.uniq(keys)),
@@ -24,13 +24,17 @@ defmodule Ortex.RunOptions do
 
           :control ->
             is_struct(value, Ortex.RunControl)
+
+          :timeout ->
+            value == :infinity or (is_integer(value) and value >= 0 and value <= 4_294_967_295)
         end
 
       unless valid,
         do: raise(ArgumentError, "invalid Ortex run option #{inspect(key)}: #{inspect(value)}")
     end
 
-    options = Map.merge(%{outputs: nil, tag: nil, control: nil}, Map.new(opts))
+    options =
+      Map.merge(%{outputs: nil, tag: nil, control: nil, timeout: :infinity}, Map.new(opts))
 
     if options.control do
       if Enum.any?(keys, &(&1 in [:outputs, :tag])),

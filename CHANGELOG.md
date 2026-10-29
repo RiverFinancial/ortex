@@ -21,6 +21,7 @@
 - Retain numeric storage/Serving support and reject unsupported batching value types early.
 - Summarize ONNX protobuf graphs without a runtime, including versions, operators, initializer estimates, and ZipMap.
 - Cancel one model-bound inference attempt with immutable `Ortex.RunControl` options.
+- Bound caller wait with per-run timeouts and cancel managed inference when its caller exits.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 

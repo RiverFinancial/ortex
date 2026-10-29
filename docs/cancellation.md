@@ -26,3 +26,32 @@ from concurrent processes. They also cancel a queued attempt while another holds
 the model mutex, check post-cancellation scores, prevent reuse/cross-model use,
 and exercise controlled string and ZipMap outputs. Both runtime 1.17.3 and 1.24.4
 are covered. Long-running provider kernels still need provider-specific validation.
+
+## Managed deadlines and ownership
+
+`Ortex.run(model, inputs, timeout: milliseconds)` creates a control automatically
+and raises `Ortex.TimeoutError` if caller wait reaches its deadline. An explicit
+control can also be paired with a timeout. Zero expires before starting a worker;
+`:infinity` is the default. Validation/control preparation precedes the deadline;
+it then covers input transfer, mutex waiting, inference, and output conversion.
+
+Finite deadlines and explicit controls use a separate native worker plus an owner
+watcher. The watcher monitors the caller and worker. Caller death or a deadline
+abort requests runtime termination and kills the BEAM worker; any executing NIF
+retains its resources until it returns. Caller wait is bounded, while native
+termination remains cooperative. An uninterruptible kernel can keep the session
+occupied until it finishes. Ordinary unbounded calls without a control keep the
+synchronous path and its allocation profile.
+
+The caller owns an Erlang reply alias. On return, exception, or timeout the alias
+is removed, pending reply/monitor messages are flushed, and late replies are
+ignored. Worker exceptions are re-raised with their original stack. Completed
+attempts do not trigger watcher cancellation, so rejecting a reused or wrong-model
+control cannot cancel its legitimate in-flight attempt.
+
+Tests exercise actual loop deadlines, caller death, deadlines behind an occupied
+mutex, post-cancel inference, worker exception stacks, resource ownership, worker
+termination, response/deadline races, and lack of late messages. Telemetry emits
+the deadline and cancellation mode in the caller's span, with TimeoutError as an
+exception event. Control preparation uses dirty CPU scheduling independently of
+the dirty I/O pool used by inference mutex waits.

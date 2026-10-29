@@ -103,4 +103,20 @@ defmodule Ortex.TelemetryTest do
     Ortex.run(sequence, {})
     assert_receive {[:ortex, :run, :stop], _, %{outputs: [%{kind: :sequence, size: 0}]}}
   end
+
+  test "deadlines emit a timeout exception in the caller span" do
+    model = load()
+
+    assert_raise Ortex.TimeoutError, fn ->
+      Ortex.run(model, {Nx.tensor([1.0, 2.0]), Nx.tensor([3.0, 4.0])}, timeout: 0, tag: "bounded")
+    end
+
+    assert_receive {[:ortex, :run, :start], _, %{timeout: 0, cancellable: true, tag: "bounded"}}
+
+    assert_receive {[:ortex, :run, :exception], %{duration: d},
+                    %{reason: %Ortex.TimeoutError{timeout: 0}}}
+
+    assert d >= 0
+    refute_receive {[:ortex, :run, :stop], _, _}
+  end
 end

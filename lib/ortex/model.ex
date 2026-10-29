@@ -80,7 +80,24 @@ defmodule Ortex.Model do
   @doc false
   def run(%__MODULE__{} = model, inputs, opts) do
     opts = Ortex.RunOptions.validate!(opts)
-    Ortex.Telemetry.run(model, inputs, opts, fn -> run_validated(model, inputs, opts) end)
+
+    Ortex.Telemetry.run(model, inputs, opts, fn ->
+      if opts.control || opts.timeout != :infinity do
+        control =
+          opts.control ||
+            Ortex.RunControl.new(
+              model,
+              Enum.reject([outputs: opts.outputs, tag: opts.tag], fn {_, value} ->
+                is_nil(value)
+              end)
+            )
+
+        opts = %{opts | control: control}
+        Ortex.Runner.run(control, opts.timeout, fn -> run_validated(model, inputs, opts) end)
+      else
+        run_validated(model, inputs, opts)
+      end
+    end)
   end
 
   defp run_validated(%__MODULE__{reference: reference}, inputs, opts)
