@@ -75,7 +75,7 @@ defmodule Ortex.Model do
         _ -> raise ArgumentError, "named inputs must map binary names to Nx tensors"
       end)
 
-    case Ortex.Native.run_named_with_options(reference, inputs, opts) do
+    case Ortex.Native.run_named_values(reference, inputs, opts) do
       {:error, message} -> raise message
       outputs -> Map.new(outputs, fn {name, tensor} -> {name, output_tensor(tensor)} end)
     end
@@ -88,7 +88,7 @@ defmodule Ortex.Model do
   defp run_validated(%Ortex.Model{reference: model}, tensors, opts) do
     # Move tensors into Ortex backend and pass the reference to the Ortex NIF
     output =
-      case Ortex.Native.run_with_options(
+      case Ortex.Native.run_values(
              model,
              tensors
              |> Tuple.to_list()
@@ -118,6 +118,10 @@ defmodule Ortex.Model do
       names: List.duplicate(nil, length(shape))
     }
   end
+
+  defp output_tensor({:tensor, descriptor}), do: output_tensor(descriptor)
+  defp output_tensor({:sequence, values}), do: Enum.map(values, &output_tensor/1)
+  defp output_tensor({:map, values}), do: values
 end
 
 defimpl Inspect, for: Ortex.Model do

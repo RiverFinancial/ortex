@@ -9,6 +9,7 @@ mod metadata;
 mod model;
 mod tensor;
 mod utils;
+mod values;
 
 use tensor::OrtexTensor;
 
@@ -88,6 +89,31 @@ fn run_named_with_options(
     options: model::InferenceOptions,
 ) -> NifResult<model::NamedOutputs> {
     model::run_named_with_options(model, inputs, options)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn run_values<'a>(
+    env: Env<'a>,
+    model: ResourceArc<model::OrtexModel>,
+    inputs: Vec<ResourceArc<OrtexTensor>>,
+    options: model::InferenceOptions,
+) -> NifResult<Vec<Term<'a>>> {
+    let inputs = model::positional_inputs(&model, inputs)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))?;
+    model::infer(model, inputs, options, |v| values::decode(env, v))
+        .map(|outputs| outputs.into_iter().map(|(_, v)| v).collect())
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn run_named_values<'a>(
+    env: Env<'a>,
+    model: ResourceArc<model::OrtexModel>,
+    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+    options: model::InferenceOptions,
+) -> NifResult<Vec<(String, Term<'a>)>> {
+    model::infer(model, inputs, options, |v| values::decode(env, v))
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 

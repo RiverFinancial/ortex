@@ -60,8 +60,8 @@ defmodule Ortex do
   binaries. Optional model fields may be `nil`; runtime-provided empty strings
   are preserved. Descriptor order follows the graph declaration.
 
-  Describing a type does not imply that `run/2` can convert its values. Map,
-  sequence, optional, string, and boolean values require separate value support.
+  Describing a type does not imply that `run/2` can convert its values.
+  Optional and string values require separate value support.
 
   This API does not parse a Rust Debug rendering. `Native.show_session/1` keeps
   its existing format for callers that still use it.
@@ -84,6 +84,12 @@ defmodule Ortex do
   does not affect binding. Positional calls continue to return tuples.
 
       outputs = Ortex.run(model, %{"features" => features})
+
+  Sequence outputs become lists and map outputs become maps with integer or
+  binary keys and numeric or boolean values, including ZipMap classifier
+  probabilities. Numeric tensors, including scalars, remain Nx tensors;
+  boolean tensors use Nx's `{:u, 8}` representation. Non-finite map floats and
+  unsupported map element types raise a recoverable error.
 
   ## Examples
 
