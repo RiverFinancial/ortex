@@ -24,6 +24,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 14 | Per-run output selection and tags |
 | 15 | Map and Sequence output values |
 | 16 | String tensors and scalar round-trips |
+| 17 | Borrowed aligned native inputs |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -43,7 +44,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 164 checks, with two optional ResNet checks
+The assembled stack currently has 167 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -58,6 +59,15 @@ empty sequences, zero-input graphs, nested value ownership, and non-finite map
 float error recovery. Unsupported map types remain recoverable errors.
 String checks cover Unicode, empty strings/tensors, matrix and scalar shapes,
 memory ownership, malformed inputs at both API layers, and numeric/bool scalars.
+Borrowed-input tests retain resources across owner exit, concurrent reuse, slicing,
+and temporary boolean conversion. Raw BEAM binaries still take a validated aligned
+copy; `TensorRef` borrows native storage only until synchronous inference returns.
+
+`bench/input_copy.exs` separates transfer cost from inference with an existing
+Ortex resource. On a local 3 MiB identity input (100 iterations), removing the
+redundant native clone changed median latency from 121 to 85 microseconds for a
+reused resource and 207 to 166 microseconds from BinaryBackend. These are local
+diagnostics, not cross-platform latency guarantees or a raw-binary zero-copy claim.
 
 The separate global-pool VM exercises **both** file and memory constructors:
 inherited pools, rejected ignored settings, explicit independent pools, unchanged
@@ -75,7 +85,6 @@ The initial runtime/build foundation is not the whole capability backlog. Contin
 with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
-- Borrowed tensor inputs and copy-cost measurements.
 - EP-specific configuration and availability checks; further environment controls.
 - Elixir telemetry, runtime logging bridge, and run-level profiling.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.
