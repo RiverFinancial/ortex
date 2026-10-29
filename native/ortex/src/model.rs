@@ -1,129 +1,139 @@
-//! Abstractions for creating an ONNX Runtime Session and Environment which can be safely
-//! passed to and from the BEAM.
-//!
-//! # Examples
-//!
-//! ```
-//! let model = init("./models/resnet50.onnx", vec![])?;
-//! let (inputs, outputs) = show(model)?;
-//! ```
-
+//! Session resources own their environment and serialize runs through a mutex.
 use crate::tensor::OrtexTensor;
-use crate::utils::{is_bool_input, map_opt_level};
-use std::convert::TryInto;
-use std::iter::zip;
+use crate::utils::{is_bool_input, map_eps, map_opt_level};
+use ort::environment::Environment;
+use ort::session::{Session, SessionInputValue};
+use ort::value::ValueType;
+use ort::Error;
+use rustler::{Atom, Env, Resource, ResourceArc};
+use std::sync::Mutex;
 
-use ort::{Error, ExecutionProviderDispatch, Session};
-use rustler::resource::ResourceArc;
-use rustler::Atom;
+pub type Description = Vec<(String, String, Option<Vec<i64>>)>;
+pub type Outputs = Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>;
 
-/// Holds the model state which include onnxruntime session and environment. All
-/// are threadsafe so this can be called concurrently from the beam.
+pub struct OrtexEnvironment {
+    environment: Environment,
+}
+// Resource encoding only copies the resource handle; it cannot mutate ort's
+// environment or its internal callback state across an unwind.
+impl std::panic::RefUnwindSafe for OrtexEnvironment {}
+#[rustler::resource_impl(name = "OrtexEnvironmentV1")]
+impl Resource for OrtexEnvironment {}
+
 pub struct OrtexModel {
-    pub session: ort::Session,
+    session: Mutex<Session>,
+    // Metadata is immutable and does not need to wait for an inference lock.
+    inputs: Description,
+    outputs: Description,
+}
+#[rustler::resource_impl(name = "OrtexModelV2")]
+impl Resource for OrtexModel {}
+
+pub fn environment() -> Result<OrtexEnvironment, String> {
+    #[cfg(feature = "load-dynamic")]
+    let builder = {
+        let path = std::env::var_os("ORT_DYLIB_PATH")
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| {
+                format!(
+                    "{}onnxruntime{}",
+                    std::env::consts::DLL_PREFIX,
+                    std::env::consts::DLL_SUFFIX
+                )
+                .into()
+            });
+        ort::init_from(std::path::PathBuf::from(path))
+            .map_err(|e| format!("Failed to load ONNX Runtime: {e}"))?
+    };
+    #[cfg(not(feature = "load-dynamic"))]
+    let builder = ort::init();
+    // ort::Error::new itself calls the runtime API, so loader failures above
+    // must remain plain strings until the library has initialized successfully.
+    (|| -> Result<OrtexEnvironment, Error> {
+        let builder = builder.with_name("Ortex");
+
+        Ok(OrtexEnvironment {
+            environment: builder.build()?,
+        })
+    })()
+    .map_err(|e| e.to_string())
 }
 
-// Since we're only using the session for inference and
-// inference is threadsafe, this Sync is safe. Additionally,
-// Environment is global and also threadsafe
-// https://github.com/microsoft/onnxruntime/issues/114
-unsafe impl Sync for OrtexModel {}
-
-/// Creates a model given the path to the model and vector of execution providers.
-/// The execution providers are Atoms from Erlang/Elixir.
 pub fn init(
-    model_path: String,
-    eps: Vec<ExecutionProviderDispatch>,
-    opt: i32,
+    env: Env,
+    path: String,
+    environment: ResourceArc<OrtexEnvironment>,
+    providers: Vec<Atom>,
+    optimization: i32,
 ) -> Result<OrtexModel, Error> {
-    // TODO: send tracing logs to erlang/elixir _somehow_
-    // tracing_subscriber::fmt::init();
-
-    let session = Session::builder()?
-        .with_optimization_level(map_opt_level(opt))?
-        .with_execution_providers(eps)?
-        .commit_from_file(model_path)?;
-
-    let state = OrtexModel { session };
-    Ok(state)
+    let providers = map_eps(env, providers, false)?;
+    let mut builder = Session::builder(&environment.environment)?
+        .with_optimization_level(map_opt_level(optimization))?
+        .with_execution_providers(providers)?;
+    let session = builder.commit_from_file(path)?;
+    let describe = |outlets: &[ort::value::Outlet]| {
+        outlets
+            .iter()
+            .map(|o| {
+                let dims = match o.dtype() {
+                    ValueType::Tensor { shape, .. } => Some(shape.to_vec()),
+                    _ => None,
+                };
+                (o.name().to_owned(), format!("{:#?}", o.dtype()), dims)
+            })
+            .collect()
+    };
+    Ok(OrtexModel {
+        inputs: describe(session.inputs()),
+        outputs: describe(session.outputs()),
+        session: Mutex::new(session),
+    })
 }
 
-/// Returns input/output information about a model. The result is a Tuple of
-/// `inputs` and `outputs` with elements of `(Name, Type, Dimension)` where
-/// `Dimension` elements of -1 are dynamic.
-pub fn show(
-    model: ResourceArc<OrtexModel>,
-) -> (
-    Vec<(String, String, Option<Vec<i64>>)>,
-    Vec<(String, String, Option<Vec<i64>>)>,
-) {
-    let model: &OrtexModel = &*model;
-
-    let mut inputs = Vec::new();
-    for input in model.session.inputs.iter() {
-        let name = input.name.to_string();
-        let repr = format!("{:#?}", input.input_type);
-        let dims = Option::<&Vec<i64>>::cloned(input.input_type.tensor_dimensions());
-        inputs.push((name, repr, dims));
-    }
-
-    let mut outputs = Vec::new();
-    for output in model.session.outputs.iter() {
-        let name = output.name.to_string();
-        let repr = format!("{:#?}", output.output_type);
-        let dims = Option::<&Vec<i64>>::cloned(output.output_type.tensor_dimensions());
-        outputs.push((name, repr, dims));
-    }
-
-    (inputs, outputs)
+pub fn show(model: ResourceArc<OrtexModel>) -> (Description, Description) {
+    (model.inputs.clone(), model.outputs.clone())
 }
 
-/// Runs the model with the given inputs. Returns a vector of tensors. Use `model::show`
-/// to see what the model expects for input and output shapes.
 pub fn run(
     model: ResourceArc<OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
-) -> Result<Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>, Error> {
-    // Grab the session and run a forward pass with it
-    let session: &ort::Session = &model.session;
-
-    let mut ortified_inputs: Vec<ort::SessionInputValue> = Vec::new();
-
-    for (elixir_input, onnx_input) in zip(inputs, &session.inputs) {
-        let derefed_input: &OrtexTensor = &elixir_input;
-        if is_bool_input(&onnx_input.input_type) {
-            // this assumes that the boolean input isn't huge -- we're cloning it twice;
-            // once below, once in the try_into()
-            let boolified_input: &OrtexTensor = &derefed_input.clone().to_bool();
-            let v: ort::SessionInputValue = boolified_input.try_into()?;
-            ortified_inputs.push(v);
+) -> Result<Outputs, Error> {
+    let mut session = model
+        .session
+        .lock()
+        .map_err(|_| Error::new("Ortex session mutex poisoned; reload the model"))?;
+    if inputs.len() != session.inputs().len() {
+        return Err(Error::new(format!(
+            "Expected {} inputs, got {}",
+            session.inputs().len(),
+            inputs.len()
+        )));
+    }
+    let mut values: Vec<SessionInputValue<'_>> = Vec::with_capacity(inputs.len());
+    for (input, descriptor) in inputs.iter().zip(session.inputs()) {
+        let input: &OrtexTensor = input;
+        if is_bool_input(descriptor.dtype()) {
+            values.push((&input.clone().to_bool()?).try_into()?);
         } else {
-            let v: ort::SessionInputValue = derefed_input.try_into()?;
-            ortified_inputs.push(v);
+            values.push(input.try_into()?);
         }
     }
-
-    // Construct a Vec of ModelOutput enums based on the DynOrtTensor data type
-    let outputs = session.run(&ortified_inputs[..])?;
-    let mut collected_outputs = Vec::new();
-
-    for output_descriptor in &session.outputs {
-        let output_name: &str = &output_descriptor.name;
-        let val = outputs.get(output_name).expect(
-            &format!(
-                "Expected {} to be in the outputs, but didn't find it",
-                output_name
-            )[..],
-        );
-
-        // NOTE: try_into impl here will implicitly map bool outputs to u8 outputs
-        let ortextensor: OrtexTensor = val.try_into()?;
-        let shape = ortextensor.shape();
-        let (dtype, bits) = ortextensor.dtype();
-
-        let collected_output = (ResourceArc::new(ortextensor), shape, dtype, bits);
-        collected_outputs.push(collected_output)
-    }
-
-    Ok(collected_outputs)
+    let names: Vec<String> = session
+        .outputs()
+        .iter()
+        .map(|o| o.name().to_owned())
+        .collect();
+    let outputs = session.run(&values[..])?;
+    names
+        .iter()
+        .map(|name| {
+            let value = outputs
+                .get(name)
+                .ok_or_else(|| Error::new(format!("Missing output {name}")))?;
+            let tensor: OrtexTensor = value.try_into()?;
+            let shape = tensor.shape();
+            let (dtype, bits) = tensor.dtype();
+            Ok((ResourceArc::new(tensor), shape, dtype, bits))
+        })
+        .collect()
 }

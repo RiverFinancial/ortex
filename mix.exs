@@ -1,11 +1,13 @@
 defmodule Ortex.MixProject do
   use Mix.Project
 
+  @version "0.2.0"
+
   def project do
     [
       app: :ortex,
-      version: "0.1.10",
-      elixir: "~> 1.14",
+      version: @version,
+      elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_ignore_filters: [~r/test\/fixtures\//],
@@ -25,14 +27,15 @@ defmodule Ortex.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {Ortex.Application, []}
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:rustler, "~> 0.27"},
+      {:rustler, "~> 0.38.0"},
       {:nx, "~> 0.6"},
       {:tokenizers, "~> 0.4", only: :dev},
       {:ex_doc, "0.29.4", only: :dev, runtime: false},

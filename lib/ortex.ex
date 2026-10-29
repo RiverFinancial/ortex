@@ -11,17 +11,15 @@ defmodule Ortex do
   of descending priority and graph optimization level 1-3. Any graph optimization level
   beyond the range of 1-3 will disable graph optimization.
 
-  By default, `Ortex` only includes some of the supported execution providers of ONNX Runtime.
-  To enable others, first ensure you have downloaded or compiled a version of
-  `libonnxruntime` that includes them, then set the environment variable `ORT_LIB_LOCATION`
-  to its location. Then add `config :ortex, Ortex.Native, features: [EXECUTION_PROVIDERS]` to your
-  `config.exs` where `EXECUTION_PROVIDERS` is a list of strings of which execution providers
-  to enable.
+  The default build loads the runtime shared library selected by `ORT_DYLIB_PATH`
+  and targets API 17. Explicit Cargo features enable accelerator providers;
+  unknown or uncompiled providers raise instead of silently becoming CPU.
+  Calls sharing one model are serialized; separate models can run concurrently.
 
   ## Examples
 
       iex> Ortex.load("./models/tinymodel.onnx")
-      iex> Ortex.load("./models/tinymodel.onnx", [:cuda, :cpu])
+      iex> Ortex.load("./models/tinymodel.onnx", [:cpu])
       iex> Ortex.load("./models/tinymodel.onnx", [:cpu], 0)
 
   """
