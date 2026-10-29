@@ -83,3 +83,14 @@ Calls sharing a model are serialized through a native mutex; separate model
 sessions may run concurrently. This follows ort's mutable-session requirement.
 See [the concurrency ADR](docs/adr-001-session-concurrency.md) and
 [the baseline measurements](docs/baseline.md).
+
+For a shared pool across models, configure the environment before starting Ortex:
+
+```elixir
+config :ortex, :environment,
+  global_thread_pool: [intra_threads: 1, inter_threads: 1, spinning: false]
+```
+
+Global-pool sessions reject local thread-count/spinning options unless
+`independent_thread_pool: true` is also supplied. Environment configuration is
+fixed for the VM lifetime. See `Ortex.Environment` and `Ortex.load/2` for options.
