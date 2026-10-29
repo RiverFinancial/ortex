@@ -8,13 +8,14 @@ defmodule Ortex.Native do
     default_features: false,
     features: Keyword.get(config, :features, ["load-dynamic", "api-17"])
 
-  def init(path, providers, optimization),
-    do: init_session(path, Ortex.Environment.get().reference, providers, optimization)
+  def init(path, providers, optimization) do
+    {_, options} = Ortex.Options.legacy!(providers, optimization)
+    init_with_options(path, Ortex.Environment.get().reference, options)
+  end
 
-  def init_session(_path, _environment, _providers, _optimization),
-    do: :erlang.nif_error(:nif_not_loaded)
-
+  def init_with_options(_path, _environment, _options), do: :erlang.nif_error(:nif_not_loaded)
   def environment(), do: :erlang.nif_error(:nif_not_loaded)
+
   def run(_model, _inputs), do: :erlang.nif_error(:nif_not_loaded)
   def from_binary(_bin, _shape, _type), do: :erlang.nif_error(:nif_not_loaded)
   def to_binary(_reference, _bits, _limit), do: :erlang.nif_error(:nif_not_loaded)

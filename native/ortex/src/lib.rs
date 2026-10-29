@@ -16,14 +16,13 @@ use rustler::ResourceArc;
 use rustler::{Atom, Env, NifResult, Term};
 
 #[rustler::nif(schedule = "DirtyIo")]
-fn init_session(
+fn init_with_options(
     env: Env,
     model_path: String,
     environment: ResourceArc<model::OrtexEnvironment>,
-    providers: Vec<Atom>,
-    optimization: i32,
+    options: model::SessionOptions,
 ) -> NifResult<ResourceArc<model::OrtexModel>> {
-    let model = model::init(env, model_path, environment, providers, optimization)
+    let model = model::init(env, model_path, environment, options)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))?;
     Ok(ResourceArc::new(model))
 }

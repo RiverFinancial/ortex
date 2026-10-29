@@ -22,8 +22,26 @@ defmodule Ortex.Model do
   defstruct [:reference]
 
   @doc false
-  def load(path, eps \\ [:cpu], opt \\ 3) do
-    case Ortex.Native.init(path, eps, opt) do
+  def load(path), do: load(path, [:cpu], 3)
+
+  def load(path, options_or_providers) when is_list(options_or_providers) do
+    if Keyword.keyword?(options_or_providers) do
+      {environment, options} = Ortex.Options.validate!(options_or_providers)
+      load_with_options(path, environment, options)
+    else
+      load(path, options_or_providers, 3)
+    end
+  end
+
+  def load(path, providers, optimization) do
+    {environment, options} = Ortex.Options.legacy!(providers, optimization)
+    load_with_options(path, environment, options)
+  end
+
+  defp load_with_options(path, environment, options) when is_binary(path) do
+    environment = environment || Ortex.Environment.get()
+
+    case Ortex.Native.init_with_options(path, environment.reference, options) do
       {:error, msg} ->
         raise msg
 
