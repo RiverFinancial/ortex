@@ -38,6 +38,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 28 | Managed deadlines and caller-exit cancellation |
 | 29 | Dirty-scheduler measurement and policy |
 | 30 | Final lifecycle/managed-run soak and review ledger |
+| 31 | Atomic control ownership before worker/deadline creation |
 
 Each PR targets the preceding branch. Merge in order with merge commits to
 preserve ancestry. If using squash/rebase merges, rebase and retarget the remaining
@@ -59,7 +60,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 216 checks, with two optional ResNet checks
+The assembled stack currently has 218 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -141,6 +142,12 @@ alone does not prove those platform or constructor combinations passed. The fina
 validation PR records exact integration run links without requiring a release tag.
 Runtime cancellation is cooperative and may finish after the caller deadline.
 Accelerator runtime execution remains unvalidated without its libraries/hardware.
+
+The final ownership fix reserves a control before creating its watcher or deadline.
+Regression tests cover a zero-deadline duplicate before native entry, wrong-model
+reuse, and 16 concurrent public reservations with exactly one successful owner.
+After the fix, another 100,000 bounded calls per runtime retained checked scores,
+bounded sampled memory, and flat process counts. Run-control resources are V2.
 
 ## Deferred scope
 

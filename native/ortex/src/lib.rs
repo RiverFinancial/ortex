@@ -278,6 +278,17 @@ fn run_started(control: ResourceArc<run_control::RunControl>) -> bool {
     control.started()
 }
 
+#[rustler::nif]
+fn reserve_run(
+    model: ResourceArc<model::OrtexModel>,
+    control: ResourceArc<run_control::RunControl>,
+) -> NifResult<Atom> {
+    control
+        .reserve(&model)
+        .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))?;
+    Ok(rustler::types::atom::ok())
+}
+
 #[cfg_attr(feature = "benchmark-dirty-cpu", rustler::nif(schedule = "DirtyCpu"))]
 #[cfg_attr(
     not(feature = "benchmark-dirty-cpu"),

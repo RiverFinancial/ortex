@@ -3,8 +3,8 @@
 `Ortex.RunControl.new(model, outputs: [...], tag: "...")` prepares immutable
 options for one model-bound inference attempt. Pass it with `control: control` to
 `Ortex.run/3`. A different process can request termination with
-`Ortex.RunControl.cancel/1`, and `started?/1` reports whether the attempt has been
-claimed, including waiting for the session mutex. A claimed control cannot be
+`Ortex.RunControl.cancel/1`, and `started?/1` reports whether the native attempt
+has been entered, including waiting for the session mutex. A reserved control cannot be
 reused even if inference fails. Invalid options are rejected before an attempt.
 
 Termination calls ONNX Runtime's run-options flag without acquiring the session
@@ -48,6 +48,14 @@ is removed, pending reply/monitor messages are flushed, and late replies are
 ignored. Worker exceptions are re-raised with their original stack. Completed
 attempts do not trigger watcher cancellation, so rejecting a reused or wrong-model
 control cannot cancel its legitimate in-flight attempt.
+
+Ownership is atomically reserved in the caller before a watcher or deadline is
+installed. Native entry then consumes that reservation exactly once. This also
+rejects duplicates while the original worker has not yet reached its NIF: a
+zero-deadline or exiting duplicate cannot cancel the original attempt. The native
+control resource is V2; a fresh VM is required when upgrading from V1 controls.
+`started?/1` remains false for a reserved attempt until native entry, including
+entry that waits for the model mutex.
 
 Tests exercise actual loop deadlines, caller death, deadlines behind an occupied
 mutex, post-cancel inference, worker exception stacks, resource ownership, worker

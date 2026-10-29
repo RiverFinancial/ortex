@@ -93,6 +93,12 @@ defmodule Ortex.Model do
             )
 
         opts = %{opts | control: control}
+
+        case Ortex.Native.reserve_run(model.reference, control.reference) do
+          :ok -> :ok
+          {:error, message} -> raise message
+        end
+
         Ortex.Runner.run(control, opts.timeout, fn -> run_validated(model, inputs, opts) end)
       else
         run_validated(model, inputs, opts)

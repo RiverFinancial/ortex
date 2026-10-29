@@ -47,6 +47,6 @@ defmodule Ortex.RunControl do
     end
   end
 
-  @doc "Returns whether the single attempt has been claimed, including waiting for the session mutex."
+  @doc "Returns whether the native attempt has been entered, including waiting for the session mutex."
   def started?(%__MODULE__{reference: reference}), do: Ortex.Native.run_started(reference)
 end

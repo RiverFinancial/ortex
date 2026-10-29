@@ -135,7 +135,10 @@ defmodule Ortex.ManagedRunsTest do
     end
 
     refute RunControl.started?(control)
-    assert_raise RuntimeError, ~r/terminate/, fn -> Ortex.run(model, input, control: control) end
+
+    assert_raise RuntimeError, ~r/already been used/, fn ->
+      Ortex.run(model, input, control: control)
+    end
 
     for timeout <- [-1, 4_294_967_296, 1.5, nil, :later] do
       assert_raise ArgumentError, fn -> Ortex.run(model, input, timeout: timeout) end
@@ -143,6 +146,66 @@ defmodule Ortex.ManagedRunsTest do
 
     assert_raise ArgumentError, fn -> RunControl.new(model, timeout: 5) end
     assert {_, _} = Ortex.run(model, input, timeout: :infinity)
+  end
+
+  test "a duplicate deadline cannot cancel a reserved attempt before its native entry" do
+    model = load("named_io")
+    control = RunControl.new(model, outputs: ["sum"])
+    :ok = Ortex.Native.reserve_run(model.reference, control.reference)
+    refute RunControl.started?(control)
+    input = {Nx.tensor([7.0, 5.0]), Nx.tensor([2.0, 1.0])}
+
+    assert_raise RuntimeError, ~r/already been used/, fn ->
+      Ortex.run(model, input, control: control, timeout: 0)
+    end
+
+    refs =
+      input
+      |> Tuple.to_list()
+      |> Enum.map(fn tensor ->
+        %Nx.Tensor{data: %Ortex.Backend{ref: ref}} = Nx.backend_transfer(tensor, Ortex.Backend)
+        ref
+      end)
+
+    [{:tensor, {ref, [2], :f, 32}}] =
+      Ortex.Native.run_controlled(model.reference, refs, control.reference)
+
+    assert Ortex.Native.to_binary(ref, 32, 2) |> Nx.from_binary(:f32) |> Nx.to_flat_list() == [
+             9.0,
+             6.0
+           ]
+  end
+
+  test "concurrent public reservations permit one successful owner" do
+    model = load("named_io")
+    control = RunControl.new(model, outputs: ["sum"])
+
+    results =
+      1..16
+      |> Task.async_stream(
+        fn _ ->
+          try do
+            {sum} =
+              Ortex.run(model, {Nx.tensor([7.0, 5.0]), Nx.tensor([2.0, 1.0])},
+                control: control,
+                timeout: 5000
+              )
+
+            {:success, Nx.to_flat_list(sum)}
+          rescue
+            error in RuntimeError -> {:rejected, error.message}
+          end
+        end,
+        max_concurrency: 16
+      )
+      |> Enum.to_list()
+
+    assert Enum.count(results, &(&1 == {:ok, {:success, [9.0, 6.0]}})) == 1
+
+    assert Enum.count(results, fn
+             {:ok, {:rejected, message}} -> message =~ "already been used"
+             _ -> false
+           end) == 15
   end
 
   test "timed-out protocol workers terminate and leave no late reply or monitor messages" do

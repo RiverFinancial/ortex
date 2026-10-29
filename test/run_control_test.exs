@@ -69,7 +69,7 @@ defmodule Ortex.RunControlTest do
     control = RunControl.new(model)
 
     assert_raise RuntimeError, ~r/another model/, fn ->
-      Ortex.run(other, inputs(), control: control)
+      Ortex.run(other, inputs(), control: control, timeout: 0)
     end
 
     assert_raise ArgumentError, fn ->
