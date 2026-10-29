@@ -31,3 +31,5 @@ ortex-*.tar
 
 /dist/
 /checksum-Elixir.Ortex.Native.exs
+
+/Dockerfile.precompiled-alpine.dockerignore

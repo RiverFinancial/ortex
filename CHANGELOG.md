@@ -8,4 +8,7 @@
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
+- Build and validate all seven artifacts, checksum maps, and a package in CI.
+- Stage attested draft releases only in RiverFinancial/ortex; no Hex publisher.
+
 Upgrade in a fresh VM; native resource layouts changed.
