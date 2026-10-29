@@ -31,6 +31,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 21 | Symbolic dimension overrides |
 | 22 | Session profiling trace retrieval |
 | 23 | Bounded runtime log bridge |
+| 24 | Environment defaults and runtime selection |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -107,6 +108,12 @@ Callbacks enqueue strings only; the BEAM environment process drains them into
 Logger. Each string field is bounded at 16 KiB with a UTF-8-safe truncation marker.
 The environment resource is V2; upgrades require a fresh VM.
 
+The environment-default VM gives config runtime paths precedence over an invalid
+`ORT_DYLIB_PATH`. It observes actual BFCArena creation to distinguish inherited
+CPU arena settings from explicit session overrides through both constructors,
+then verifies retained resource identity and rejected configuration changes across
+application restarts. Legacy positional loading keeps its CPU defaults.
+
 CI covers API 17/runtime 1.17.3, API 17/runtime 1.24.4, API 24/runtime 1.24.4,
 both Alpine architectures, all seven NIF targets, and complete checksum/package
 assembly. PR checks and workflow artifacts are the current evidence; a test count
@@ -118,7 +125,6 @@ The initial runtime/build foundation is not the whole capability backlog. Contin
 with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
-- Further environment controls.
 - Per-run profiling toggles require API 25 and remain deferred beyond the API
   17/24 runtime matrix; session profiling is available now.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.

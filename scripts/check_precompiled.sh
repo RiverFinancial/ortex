@@ -21,6 +21,7 @@ export MIX_ENV=test
 mix clean
 mix test
 mix run --no-start scripts/check_global_pool.exs
+mix run --no-start scripts/check_environment_defaults.exs
 mix run --no-start scripts/check_runtime_logs.exs info
 mix run --no-start scripts/check_runtime_logs.exs warning
 ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_binary_without_runtime.exs

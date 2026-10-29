@@ -195,19 +195,21 @@ pub fn concatenate(
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn environment(
+    env: Env,
     options: Option<model::PoolOptions>,
 ) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
-    model::environment(options, None)
+    model::environment(env, model::EnvironmentOptions::legacy(options, None))
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn environment_with_logs(
+    env: Env,
     options: Option<model::PoolOptions>,
     log_level: Option<i32>,
 ) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
-    model::environment(options, log_level)
+    model::environment(env, model::EnvironmentOptions::legacy(options, log_level))
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e)))
 }
@@ -224,3 +226,13 @@ fn take_runtime_logs(
 }
 
 rustler::init!("Elixir.Ortex.Native");
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn environment_with_options(
+    env: Env,
+    options: model::EnvironmentOptions,
+) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
+    model::environment(env, options)
+        .map(ResourceArc::new)
+        .map_err(|e| rustler::Error::Term(Box::new(e)))
+}

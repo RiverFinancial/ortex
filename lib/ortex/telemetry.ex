@@ -8,7 +8,8 @@ defmodule Ortex.Telemetry do
   units. Convert durations with `System.convert_time_unit/3`.
 
   Load metadata includes `:source` (`:file` or `:memory`), `:path` or `:byte_size`,
-  `:providers`, and `:optimization_level`. Successful loads add the opaque
+  `:providers`, and `:optimization_level`. A `nil` provider option means that
+  the session inherits environment providers. Successful loads add the opaque
   `:model` reference. Run metadata includes the model reference, `:tag`,
   `:selected_outputs`, and `:inputs` summaries; successful runs add `:outputs`.
   Summaries include tensor shapes/dtypes or container kind/size, without tensor
