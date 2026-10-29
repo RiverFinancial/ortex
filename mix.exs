@@ -39,6 +39,7 @@ defmodule Ortex.MixProject do
       {:rustler_precompiled, "~> 0.10.1"},
       {:nx, "~> 0.6"},
       {:telemetry, "~> 1.0"},
+      {:protox, "~> 2.0.10"},
       {:tokenizers, "~> 0.4", only: :dev},
       {:ex_doc, "0.29.4", only: :dev, runtime: false},
       {:exla, "~> 0.6", only: :dev},
@@ -49,9 +50,9 @@ defmodule Ortex.MixProject do
   defp package do
     [
       files:
-        ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG* checksum-*.exs docs native/ortex/src/ config/config.exs
+        ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG* checksum-*.exs docs priv/proto native/ortex/src/ config/config.exs
         native/ortex/Cargo.lock native/ortex/Cargo.toml native/ortex/.cargo/config.toml),
-      licenses: ["MIT"],
+      licenses: ["MIT", "Apache-2.0"],
       links: %{"GitHub" => "https://github.com/RiverFinancial/ortex"},
       description: "ONNX Runtime bindings for Elixir"
     ]

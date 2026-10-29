@@ -36,6 +36,10 @@ To see more real world examples see the `examples` folder.
 Public loading and inference calls emit `:telemetry` spans. See `Ortex.Telemetry`
 for event names, measurements, and shape/type metadata.
 
+`Ortex.Graph.from_binary(bytes)` and `Ortex.Graph.from_file(path)` summarize ONNX
+versions, operators, initializer sizes, and ZipMap presence without creating a
+runtime session or opening external weight files.
+
 ### Serving
 
 `Ortex` also implements `Nx.Serving` behaviour. To use it in your application's
