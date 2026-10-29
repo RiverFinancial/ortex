@@ -12,24 +12,24 @@ use ort::{ep::ExecutionProviderDispatch, session::builder::GraphOptimizationLeve
 
 // BEAM sub-binaries are not guaranteed to be aligned. Decode into owned storage
 // rather than manufacturing a mutable ndarray view over an immutable binary.
+// Keep validation errors as strings: constructing ort::Error itself invokes the
+// runtime API, which may not be loaded for standalone tensor conversions.
 pub fn from_binary(
     bin: Binary,
     shape: Vec<usize>,
     dtype_str: String,
     dtype_bits: usize,
-) -> Result<ResourceArc<OrtexTensor>, ort::Error> {
+) -> Result<ResourceArc<OrtexTensor>, String> {
     let count = shape
         .iter()
         .try_fold(1usize, |n, d| n.checked_mul(*d))
-        .ok_or_else(|| ort::Error::new("tensor shape overflow"))?;
+        .ok_or_else(|| "tensor shape overflow".to_owned())?;
     let bytes = dtype_bits
         .checked_div(8)
         .and_then(|size| count.checked_mul(size))
-        .ok_or_else(|| ort::Error::new("tensor byte size overflow"))?;
+        .ok_or_else(|| "tensor byte size overflow".to_owned())?;
     if bytes != bin.len() {
-        return Err(ort::Error::new(
-            "binary size does not match tensor shape and type",
-        ));
+        return Err("binary size does not match tensor shape and type".to_owned());
     }
     macro_rules! decode {
         ($ty:ty, $variant:ident, $convert:expr) => {{
@@ -41,8 +41,7 @@ pub fn from_binary(
                     ($convert)(v)
                 })
                 .collect();
-            let array = ArrayD::from_shape_vec(IxDyn(&shape), data)
-                .map_err(|e| ort::Error::new(e.to_string()))?;
+            let array = ArrayD::from_shape_vec(IxDyn(&shape), data).map_err(|e| e.to_string())?;
             Ok(ResourceArc::new(OrtexTensor::$variant(array)))
         }};
     }
@@ -59,7 +58,7 @@ pub fn from_binary(
         ("u", 16) => decode!(u16, u16, |v| v),
         ("u", 32) => decode!(u32, u32, |v| v),
         ("u", 64) => decode!(u64, u64, |v| v),
-        _ => Err(ort::Error::new("unsupported tensor type")),
+        _ => Err("unsupported tensor type".to_owned()),
     }
 }
 

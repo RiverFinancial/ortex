@@ -54,6 +54,8 @@ jobs:
       - run: mix run --no-start scripts/check_global_pool.exs
       - name: Verify recoverable runtime loading errors
         run: ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_missing_runtime.exs
+      - name: Validate tensors before runtime startup
+        run: ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_binary_without_runtime.exs
       - name: Record diagnostic benchmark
         run: mix run bench/inference.exs 2000 8
   alpine:
