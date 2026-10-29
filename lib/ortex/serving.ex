@@ -6,6 +6,11 @@ defmodule Ortex.Serving do
   `defn` functions in this are not supported, it is strictly for serving batches to
   an `Ortex.Model` for inference.
 
+  This adapter supports numeric/boolean tensor models with a leading batch axis,
+  using positional tensor tuples or maps of binary input/output names. Use direct
+  `Ortex.run/2` for strings, scalar tensors, and Map/Sequence outputs. This batching
+  adapter rejects those types and Optional values.
+
   ## Examples
 
   ### Inline/serverless workflow 
@@ -60,9 +65,24 @@ defmodule Ortex.Serving do
 
   @impl true
   def init(_inline_or_process, model, [_defn_options]) do
+    metadata = Ortex.metadata(model)
+
+    for %{name: name, type: type} <- metadata.inputs ++ metadata.outputs do
+      unless batch_tensor?(type) do
+        raise ArgumentError,
+              "Ortex.Serving requires numeric tensor inputs/outputs with a batch axis; #{inspect(name)} has type #{inspect(type)}"
+      end
+    end
+
     func = fn x -> Ortex.run(model, x) end
     {:ok, func}
   end
+
+  defp batch_tensor?({:tensor, {kind, _bits}, shape}) when kind in [:s, :u, :f, :bf],
+    do: tuple_size(shape) > 0
+
+  defp batch_tensor?({:tensor, :bool, shape}), do: tuple_size(shape) > 0
+  defp batch_tensor?(_), do: false
 
   @impl true
   def handle_batch(batch, _partition, function) do

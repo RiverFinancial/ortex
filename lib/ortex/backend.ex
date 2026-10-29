@@ -8,6 +8,11 @@ defmodule Ortex.Backend do
 
   Since this does not implement most `Nx` operations, it's best *NOT* to set this as
   the default backend.
+
+  The fork retains this backend as numeric tensor storage and transfer support,
+  plus the shape/slice/concatenate operations required by `Nx.Serving`. Transfer
+  results to a compute backend before arithmetic or `Nx.Defn` work. Strings use
+  `Ortex.StringTensor`; map and sequence outputs use ordinary Elixir containers.
   """
 
   @behaviour Nx.Backend
