@@ -25,6 +25,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 15 | Map and Sequence output values |
 | 16 | String tensors and scalar round-trips |
 | 17 | Borrowed aligned native inputs |
+| 18 | Longer inference and load/disposal diagnostic |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -69,6 +70,20 @@ redundant native clone changed median latency from 121 to 85 microseconds for a
 reused resource and 207 to 166 microseconds from BinaryBackend. These are local
 diagnostics, not cross-platform latency guarantees or a raw-binary zero-copy claim.
 
+`bench/lifecycle.exs` validates golden scores on each repeated run and each model
+loaded by a short-lived owner process. A local Apple silicon run exercised 100,000
+runs plus 1,000 alternating file/memory load/disposal cycles per runtime:
+
+| Runtime | Warmup RSS | Maximum run RSS | Final load/disposal RSS |
+| --- | --- | --- | --- |
+| 1.17.3 | 104,005,632 | 104,759,296 | 103,596,032 |
+| 1.24.4 | 109,608,960 | 110,346,240 | 109,297,664 |
+
+These byte counts include BEAM and allocator retention. The bounded samples do
+not show sustained growth for this synthetic CPU workload; they do not prove the
+absence of leaks in other graphs, providers, or runtime versions. Run this script
+against any production-representative fixtures before changing a consumer.
+
 The separate global-pool VM exercises **both** file and memory constructors:
 inherited pools, rejected ignored settings, explicit independent pools, unchanged
 scores, and resource survival through application restart. The precompiled check
@@ -89,7 +104,7 @@ with separate focused PRs for:
 - Elixir telemetry, runtime logging bridge, and run-level profiling.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.
 - An explicit decision for the partial Nx backend and Serving support.
-- Longer memory/load/disposal measurements and dirty-scheduler classification.
+- Dirty-scheduler classification under representative concurrent inference.
 
 GPU/NN primitives remain a later or measurement-dependent stage: shared weights
 and pooling, AOT compilation, I/O binding, device allocation, and adapters. Keep
