@@ -48,6 +48,16 @@ fn metadata<'a>(env: Env<'a>, model: ResourceArc<model::OrtexModel>) -> NifResul
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
+fn end_profiling(model: ResourceArc<model::OrtexModel>) -> NifResult<String> {
+    let error = |message: String| rustler::Error::Term(Box::new(message));
+    let mut session = model
+        .session
+        .lock()
+        .map_err(|_| error("Ortex session mutex poisoned; reload the model".into()))?;
+    session.end_profiling().map_err(|e| error(e.to_string()))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
 fn execution_providers(
     _environment: ResourceArc<model::OrtexEnvironment>,
 ) -> NifResult<Vec<(Atom, bool, Option<bool>)>> {

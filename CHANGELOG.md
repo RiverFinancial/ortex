@@ -15,6 +15,7 @@
 - Emit public load/run telemetry spans with durations, model references, tags, and value summaries.
 - Configure provider option maps and query compiled/runtime provider availability.
 - Specialize symbolic model dimensions with validated session overrides.
+- Flush session profiling traces and retrieve their path with `end_profiling/1`.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
