@@ -24,6 +24,13 @@ consumers run in a separate Alpine image that has no Rust toolchain installed.
 - The archive contains only the NIF. RustlerPrecompiled verifies SHA-256 against
   the checksum map shipped inside the Hex package.
 
+The macOS 1.22.0 runtime aborted at process exit after passing all inference
+assertions, on both Intel CI and local arm64. The symptom is reported in
+[ONNX Runtime issue 24579](https://github.com/microsoft/onnxruntime/issues/24579).
+Local arm64 runtime 1.23.2 exits cleanly; Intel CI uses 1.23.2 because official
+runtime 1.24.4 binaries are arm64-only on macOS. Keep process-exit success in the
+consumer checks: assertions alone must not conceal a shutdown abort.
+
 ## Publishing a version
 
 1. Set matching stable versions in `mix.exs` and `native/ortex/Cargo.toml`, refresh

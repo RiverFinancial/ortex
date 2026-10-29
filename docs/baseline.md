@@ -61,3 +61,6 @@ official ONNX Runtime 1.17.3 arm64 macOS library. That test exposed an important
 compatibility detail: opt=3 must map to `GraphOptimizationLevel::All` (99).
 Current ort's `Level3` maps to the newer layout-only value (3), which runtime
 1.17 rejects. The wrapper preserves legacy all-optimizations behavior.
+
+A separate Nx 0.10 application also loaded and scored with the precompiled NIF,
+including `Nx.Serving`, with Rustler absent from its dependency graph.

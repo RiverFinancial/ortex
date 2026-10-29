@@ -77,6 +77,12 @@ runtime 1.17.3 and 1.24.4 releases and Alpine's 1.24.4 package. A newer runtime 
 serve an older API; selecting `api-24` instead requires runtime 1.24 or newer.
 The runtime version and the ort Rust crate version are distinct.
 
+Runtime compatibility also depends on vendor bugs. macOS runtime 1.22.0 passed
+inference checks but aborted during process shutdown in our validation, matching
+an [upstream-reported symptom](https://github.com/microsoft/onnxruntime/issues/24579).
+The same arm64 checks exit cleanly with 1.17.3, 1.23.2, and 1.24.4. Intel macOS
+CI uses the official 1.23.2 binary; runtime 1.24.4 has no official Intel artifact.
+
 Source builds need Rust >= 1.92, Elixir >= 1.16, and OTP >= 24. The release NIF ABI
 is 2.16, also usable by newer OTP versions. Cargo's default build uses dynamic
 loading and needs no ONNX Runtime headers, library, or OpenSSL at compile time.
