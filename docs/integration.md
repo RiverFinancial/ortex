@@ -26,6 +26,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 16 | String tensors and scalar round-trips |
 | 17 | Borrowed aligned native inputs |
 | 18 | Longer inference and load/disposal diagnostic |
+| 19 | Public load/run telemetry |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -45,7 +46,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 167 checks, with two optional ResNet checks
+The assembled stack currently has 173 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -60,6 +61,8 @@ empty sequences, zero-input graphs, nested value ownership, and non-finite map
 float error recovery. Unsupported map types remain recoverable errors.
 String checks cover Unicode, empty strings/tensors, matrix and scalar shapes,
 memory ownership, malformed inputs at both API layers, and numeric/bool scalars.
+Telemetry checks assert start/stop/exception contracts, file/memory load metadata,
+named selected outputs, model references, durations, tags, and shape summaries.
 Borrowed-input tests retain resources across owner exit, concurrent reuse, slicing,
 and temporary boolean conversion. Raw BEAM binaries still take a validated aligned
 copy; `TensorRef` borrows native storage only until synchronous inference returns.
@@ -101,7 +104,7 @@ with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
 - EP-specific configuration and availability checks; further environment controls.
-- Elixir telemetry, runtime logging bridge, and run-level profiling.
+- Runtime logging bridge and run-level profiling.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.
 - An explicit decision for the partial Nx backend and Serving support.
 - Dirty-scheduler classification under representative concurrent inference.

@@ -38,6 +38,7 @@ defmodule Ortex.MixProject do
       {:rustler, "~> 0.38.0", optional: true},
       {:rustler_precompiled, "~> 0.10.1"},
       {:nx, "~> 0.6"},
+      {:telemetry, "~> 1.0"},
       {:tokenizers, "~> 0.4", only: :dev},
       {:ex_doc, "0.29.4", only: :dev, runtime: false},
       {:exla, "~> 0.6", only: :dev},
