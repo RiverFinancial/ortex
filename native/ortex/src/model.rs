@@ -18,7 +18,7 @@ pub struct OrtexEnvironment {
 // Resource encoding only copies the resource handle; it cannot mutate ort's
 // environment or its internal callback state across an unwind.
 impl std::panic::RefUnwindSafe for OrtexEnvironment {}
-#[rustler::resource_impl]
+#[rustler::resource_impl(name = "OrtexEnvironmentV1")]
 impl Resource for OrtexEnvironment {}
 
 pub struct OrtexModel {
@@ -27,7 +27,7 @@ pub struct OrtexModel {
     inputs: Description,
     outputs: Description,
 }
-#[rustler::resource_impl]
+#[rustler::resource_impl(name = "OrtexModelV2")]
 impl Resource for OrtexModel {}
 
 #[derive(NifMap)]

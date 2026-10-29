@@ -19,6 +19,8 @@ consumers run in a separate Alpine image that has no Rust toolchain installed.
   builds. Musl has separate artifacts and never consumes glibc binaries.
 - CPU provider only; runtime library supplied by the consumer. Custom Cargo
   features select source builds, preventing accidental reuse of CPU-only assets.
+- Musl artifacts are built inside pinned Alpine with its native Rust 1.96.1
+  toolchain, avoiding accidental glibc libgcc dependencies from a host linker.
 - The archive contains only the NIF. RustlerPrecompiled verifies SHA-256 against
   the checksum map shipped inside the Hex package.
 
@@ -43,6 +45,8 @@ Do not use `--ignore-unavailable` when preparing a release. Missing targets,
 missing checksums, mismatched versions, failed consumers, or absent provenance
 must fail the pipeline. Checksums are generated into the package, not guessed or
 committed before binaries exist. Do not alter a published release's NIF assets.
+Upgrade from 0.1.x in a fresh VM; the native resource representations changed.
+Versioned resource names prevent takeover of old-layout resources during reload.
 
 ## Local precompiled verification
 

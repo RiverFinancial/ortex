@@ -35,7 +35,7 @@ pub enum OrtexTensor {
     bool(Array<bool, IxDyn>),
 }
 
-#[rustler::resource_impl]
+#[rustler::resource_impl(name = "OrtexTensorV2")]
 impl Resource for OrtexTensor {}
 
 impl OrtexTensor {

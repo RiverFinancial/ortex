@@ -3,6 +3,7 @@
 ## 0.2.0 (unreleased)
 
 - Pin ort to 2.0.0-rc.15 and upgrade Rustler to 0.38. Elixir 1.16 is now required.
+  Upgrade in a fresh VM; native resources have new layouts and versioned names.
 - Serialize inference per session without the previous unsafe Sync implementation;
   retain legacy public load/run arities and the native init compatibility wrapper.
 - Add validated keyword session options, threading/spinning controls, an explicit

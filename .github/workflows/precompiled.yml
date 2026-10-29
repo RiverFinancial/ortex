@@ -48,16 +48,17 @@ jobs:
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - name: Install Rust
+        if: ${{ !contains(matrix.target, 'musl') }}
         run: rustup toolchain install 1.93.1 --profile minimal --target "$TARGET"
-      - name: Install musl linker
-        if: contains(matrix.target, 'musl')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          echo "CARGO_TARGET_$(echo "$TARGET" | tr '[:lower:]-' '[:upper:]_')_LINKER=musl-gcc" >> "$GITHUB_ENV"
       - name: Build the NIF without ONNX Runtime installed
+        if: ${{ !contains(matrix.target, 'musl') }}
         working-directory: native/ortex
         run: cargo +1.93.1 build --release --locked --target "$TARGET"
+      - name: Build musl NIF without ONNX Runtime installed
+        if: contains(matrix.target, 'musl')
+        run: |
+          docker build --progress=plain -f Dockerfile.nif-musl --build-arg "TARGET=$TARGET" \
+            --output "type=local,dest=native/ortex/target/$TARGET/release" .
       - name: Package NIF
         run: python scripts/package_nif.py "$TARGET" "$VERSION"
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
@@ -88,16 +89,11 @@ jobs:
           name: nif-${{ matrix.target }}
           path: dist/*.tar.gz
           if-no-files-found: error
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'RiverFinancial/ortex'
-    needs: [build, validate-release]
+  package:
+    name: Build complete Hex package
+    needs: build
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
     env:
-      GH_TOKEN: ${{ github.token }}
       MIX_ENV: prod
       ORTEX_BUILD: 'true'
     steps:
@@ -111,7 +107,7 @@ jobs:
           pattern: nif-*
           merge-multiple: true
           path: dist
-      - name: Generate checksums and Hex package
+      - name: Generate complete checksums and Hex package
         run: |
           elixir scripts/checksums.exs dist --all
           cp checksum-Elixir.Ortex.Native.exs dist/
@@ -119,6 +115,32 @@ jobs:
           mix deps.get --check-locked
           mix hex.build
           cp ortex-*.tar dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: hex-package
+          path: |
+            dist/ortex-*.tar
+            dist/checksum-Elixir.Ortex.Native.exs
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'RiverFinancial/ortex'
+    needs: [package, validate-release]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MIX_ENV: prod
+      ORTEX_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: "*"
+          merge-multiple: true
+          path: dist
       - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: dist/*
