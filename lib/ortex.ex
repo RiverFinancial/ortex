@@ -98,4 +98,19 @@ defmodule Ortex do
 
   """
   defdelegate run(model, tensors), to: Ortex.Model
+
+  @doc """
+  Runs inference with a keyword list of per-run options.
+
+  `:outputs` selects a non-empty list of binary output names. Only selected
+  outputs are requested from the runtime; positional calls return them as a
+  tuple in the requested order, while named calls return a map. Omitting this
+  option returns every output in graph order.
+
+  `:tag` is a binary identifying the run in runtime logs. Options apply to this
+  call only and do not mutate the session's defaults.
+
+      Ortex.run(model, %{"features" => features}, outputs: ["scores"], tag: "risk-score")
+  """
+  defdelegate run(model, tensors, opts), to: Ortex.Model
 end

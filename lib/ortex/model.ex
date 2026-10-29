@@ -62,33 +62,38 @@ defmodule Ortex.Model do
   end
 
   @doc false
-  def run(%__MODULE__{reference: reference}, inputs)
-      when is_map(inputs) and not is_struct(inputs) do
+  def run(model, inputs), do: run(model, inputs, [])
+
+  @doc false
+  def run(model, inputs, opts), do: run_validated(model, inputs, Ortex.RunOptions.validate!(opts))
+
+  defp run_validated(%__MODULE__{reference: reference}, inputs, opts)
+       when is_map(inputs) and not is_struct(inputs) do
     inputs =
       Enum.map(inputs, fn
         {name, %Nx.Tensor{} = tensor} when is_binary(name) -> {name, input_reference(tensor)}
         _ -> raise ArgumentError, "named inputs must map binary names to Nx tensors"
       end)
 
-    case Ortex.Native.run_named(reference, inputs) do
+    case Ortex.Native.run_named_with_options(reference, inputs, opts) do
       {:error, message} -> raise message
       outputs -> Map.new(outputs, fn {name, tensor} -> {name, output_tensor(tensor)} end)
     end
   end
 
-  def run(%Ortex.Model{} = model, tensor) when not is_tuple(tensor) do
-    run(model, {tensor})
+  defp run_validated(%Ortex.Model{} = model, tensor, opts) when not is_tuple(tensor) do
+    run_validated(model, {tensor}, opts)
   end
 
-  @doc false
-  def run(%Ortex.Model{reference: model}, tensors) do
+  defp run_validated(%Ortex.Model{reference: model}, tensors, opts) do
     # Move tensors into Ortex backend and pass the reference to the Ortex NIF
     output =
-      case Ortex.Native.run(
+      case Ortex.Native.run_with_options(
              model,
              tensors
              |> Tuple.to_list()
-             |> Enum.map(&input_reference/1)
+             |> Enum.map(&input_reference/1),
+             opts
            ) do
         {:error, msg} -> raise msg
         output -> output

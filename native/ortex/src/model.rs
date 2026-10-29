@@ -3,6 +3,7 @@ use crate::tensor::OrtexTensor;
 use crate::utils::{is_bool_input, map_eps, map_opt_level};
 use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
+use ort::session::{OutputSelector, RunOptions};
 use ort::value::ValueType;
 use ort::Error;
 use rustler::{Atom, Env, NifMap, Resource, ResourceArc};
@@ -11,6 +12,12 @@ use std::sync::Mutex;
 pub type Description = Vec<(String, String, Option<Vec<i64>>)>;
 pub type Outputs = Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>;
 pub type NamedOutputs = Vec<(String, (ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize))>;
+
+#[derive(NifMap, Default)]
+pub struct InferenceOptions {
+    outputs: Option<Vec<String>>,
+    tag: Option<String>,
+}
 
 pub struct OrtexEnvironment {
     environment: Environment,
@@ -204,6 +211,14 @@ pub fn run(
     model: ResourceArc<OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
 ) -> Result<Outputs, Error> {
+    run_with_options(model, inputs, InferenceOptions::default())
+}
+
+pub fn run_with_options(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<ResourceArc<OrtexTensor>>,
+    options: InferenceOptions,
+) -> Result<Outputs, Error> {
     if inputs.len() != model.inputs.len() {
         return Err(Error::new(format!(
             "Expected {} inputs, got {}",
@@ -217,12 +232,21 @@ pub fn run(
         .zip(inputs)
         .map(|(descriptor, input)| (descriptor.0.clone(), input))
         .collect();
-    run_named(model, inputs).map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
+    run_named_with_options(model, inputs, options)
+        .map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
 }
 
 pub fn run_named(
     model: ResourceArc<OrtexModel>,
     inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+) -> Result<NamedOutputs, Error> {
+    run_named_with_options(model, inputs, InferenceOptions::default())
+}
+
+pub fn run_named_with_options(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+    options: InferenceOptions,
 ) -> Result<NamedOutputs, Error> {
     let mut session = model
         .session
@@ -254,12 +278,37 @@ pub fn run_named(
         };
         values.push((name.clone(), value));
     }
-    let names: Vec<String> = session
-        .outputs()
-        .iter()
-        .map(|o| o.name().to_owned())
-        .collect();
-    let outputs = session.run(values)?;
+    let names: Vec<String> = options.outputs.unwrap_or_else(|| {
+        session
+            .outputs()
+            .iter()
+            .map(|o| o.name().to_owned())
+            .collect()
+    });
+    if names.is_empty() {
+        return Err(Error::new("outputs must be non-empty"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for name in &names {
+        if !seen.insert(name) {
+            return Err(Error::new(format!("Duplicate output {name:?}")));
+        }
+        if !session.outputs().iter().any(|d| d.name() == name) {
+            return Err(Error::new(format!("Unknown output {name:?}")));
+        }
+    }
+    let mut run_options = RunOptions::new()?;
+    if let Some(tag) = options.tag {
+        run_options = run_options.with_tag(tag)?;
+    }
+    let run_options = run_options.with_outputs(
+        names
+            .iter()
+            .fold(OutputSelector::no_default(), |selector, name| {
+                selector.with(name)
+            }),
+    );
+    let outputs = session.run_with_options(values, &run_options)?;
     names
         .iter()
         .map(|name| {
