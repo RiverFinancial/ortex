@@ -51,6 +51,7 @@ jobs:
           echo 'import_config "ci.exs"' >> config/config.exs
       - run: mix compile --warnings-as-errors
       - run: mix test
+      - run: mix run --no-start scripts/check_global_pool.exs
       - name: Verify recoverable runtime loading errors
         run: ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_missing_runtime.exs
       - name: Record diagnostic benchmark

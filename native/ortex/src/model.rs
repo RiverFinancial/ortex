@@ -1,7 +1,7 @@
 //! Session resources own their environment and serialize runs through a mutex.
 use crate::tensor::OrtexTensor;
 use crate::utils::{is_bool_input, map_eps, map_opt_level};
-use ort::environment::Environment;
+use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{Session, SessionInputValue};
 use ort::value::ValueType;
 use ort::Error;
@@ -13,6 +13,7 @@ pub type Outputs = Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>;
 
 pub struct OrtexEnvironment {
     environment: Environment,
+    global_pool: bool,
 }
 // Resource encoding only copies the resource handle; it cannot mutate ort's
 // environment or its internal callback state across an unwind.
@@ -29,7 +30,15 @@ pub struct OrtexModel {
 #[rustler::resource_impl(name = "OrtexModelV2")]
 impl Resource for OrtexModel {}
 
-pub fn environment() -> Result<OrtexEnvironment, String> {
+#[derive(NifMap)]
+pub struct PoolOptions {
+    intra_threads: Option<usize>,
+    inter_threads: Option<usize>,
+    spinning: Option<bool>,
+}
+
+pub fn environment(options: Option<PoolOptions>) -> Result<OrtexEnvironment, String> {
+    let global_pool = options.is_some();
     #[cfg(feature = "load-dynamic")]
     let builder = {
         let path = std::env::var_os("ORT_DYLIB_PATH")
@@ -50,10 +59,23 @@ pub fn environment() -> Result<OrtexEnvironment, String> {
     // ort::Error::new itself calls the runtime API, so loader failures above
     // must remain plain strings until the library has initialized successfully.
     (|| -> Result<OrtexEnvironment, Error> {
-        let builder = builder.with_name("Ortex");
-
+        let mut builder = builder.with_name("Ortex");
+        if let Some(options) = options {
+            let mut pool = GlobalThreadPoolOptions::default();
+            if let Some(n) = options.intra_threads {
+                pool = pool.with_intra_threads(n)?;
+            }
+            if let Some(n) = options.inter_threads {
+                pool = pool.with_inter_threads(n)?;
+            }
+            if let Some(spin) = options.spinning {
+                pool = pool.with_spin_control(spin)?;
+            }
+            builder = builder.with_global_thread_pool(pool);
+        }
         Ok(OrtexEnvironment {
             environment: builder.build()?,
+            global_pool,
         })
     })()
     .map_err(|e| e.to_string())
@@ -83,6 +105,15 @@ pub fn init(
     environment: ResourceArc<OrtexEnvironment>,
     opts: SessionOptions,
 ) -> Result<OrtexModel, Error> {
+    if environment.global_pool
+        && !opts.independent_thread_pool
+        && (opts.intra_threads.is_some()
+            || opts.inter_threads.is_some()
+            || opts.intra_op_spinning.is_some()
+            || opts.inter_op_spinning.is_some())
+    {
+        return Err(Error::new("session thread counts/spinning require independent_thread_pool: true when using a global pool"));
+    }
     let providers = map_eps(env, opts.providers, opts.error_on_failure)?;
     let mut builder = Session::builder(&environment.environment)?
         .with_optimization_level(map_opt_level(opts.optimization_level))?

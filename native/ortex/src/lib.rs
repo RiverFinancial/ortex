@@ -103,8 +103,10 @@ pub fn concatenate(
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
-fn environment() -> NifResult<ResourceArc<model::OrtexEnvironment>> {
-    model::environment()
+fn environment(
+    options: Option<model::PoolOptions>,
+) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
+    model::environment(options)
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }

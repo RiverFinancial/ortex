@@ -16,7 +16,7 @@ defmodule Ortex do
   `inter_op_spinning`, `independent_thread_pool`, `environment`, `profiling`,
   `optimized_model_path`, `deterministic_compute`, `memory_pattern`, and `log_id`.
   Thread counts are non-negative integers; zero leaves selection to the runtime.
-  Use `Ortex.Environment.get/0` to pass the environment handle explicitly.
+  See `Ortex.Environment` for shared global pools.
 
   The source build targets API 17 by default and uses `ORT_DYLIB_PATH` to
   find the runtime library. Accelerator providers require explicit Cargo features

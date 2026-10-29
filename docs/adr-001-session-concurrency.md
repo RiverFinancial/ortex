@@ -28,7 +28,9 @@ ort rc.14 also requires an explicit environment. Sessions retain ort's environme
 through their internal session ownership. An environment resource is additionally
 owned by the BEAM application and retained for VM lifetime: ort permits only one
 creation, even after its last reference is dropped. This supports application
-restarts without Rust static environment/session resources.
+restarts without Rust static environment/session resources. Global pool settings
+are selected before startup; session-local thread tuning requires an explicit
+independent pool when the global pool is enabled.
 
 Sources: `ort` v2.0.0-rc.15 `src/session/mod.rs` and `src/environment.rs`; see
 `docs/baseline.md` for the reproducible before/after measurements.
