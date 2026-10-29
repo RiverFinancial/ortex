@@ -1,6 +1,7 @@
 //! Session resources own their environment and serialize runs through a mutex.
+use crate::providers::{map_eps, ProviderConfig};
 use crate::tensor::OrtexTensor;
-use crate::utils::{map_eps, map_opt_level};
+use crate::utils::map_opt_level;
 use crate::values::InputValue;
 use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
@@ -92,7 +93,7 @@ pub fn environment(options: Option<PoolOptions>) -> Result<OrtexEnvironment, Str
 
 #[derive(NifMap)]
 pub struct SessionOptions {
-    providers: Vec<Atom>,
+    providers: Vec<ProviderConfig>,
     optimization_level: i32,
     error_on_failure: bool,
     intra_threads: Option<usize>,

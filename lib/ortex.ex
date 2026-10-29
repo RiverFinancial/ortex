@@ -24,6 +24,12 @@ defmodule Ortex do
   fail on provider registration errors unless `error_on_failure: false` is set.
   Positional arities preserve legacy optimization and registration behavior.
 
+  Provider entries may be atoms or `{provider, %{binary_key => binary_value}}`
+  tuples, in descending priority. For example,
+  `providers: [{:cpu, %{"arena_allocator" => "true"}}]`. Unknown options raise;
+  accelerator option values are validated during runtime registration. See
+  `docs/providers.md` for supported keys and build requirements.
+
   ## Examples
 
       iex> Ortex.load("./models/tinymodel.onnx")
@@ -67,6 +73,29 @@ defmodule Ortex do
   its existing format for callers that still use it.
   """
   defdelegate metadata(model), to: Ortex.Model
+
+  @doc """
+  Reports supported execution providers and their build/runtime availability.
+
+  Returns a map from provider atoms to `%{compiled: boolean, available: boolean | nil}`.
+  `:compiled` means this NIF has registration support; `:available` means the
+  loaded runtime advertises the provider. `:available` is `nil` when this NIF
+  lacks registration support and cannot query that provider through ort.
+  Availability does not guarantee device
+  usability, dependency loading, or support for a particular graph. Registration
+  with `error_on_failure: true` remains the check when creating a session.
+  """
+  def execution_providers do
+    case Ortex.Native.execution_providers(Ortex.Environment.get().reference) do
+      {:error, message} ->
+        raise message
+
+      providers ->
+        Map.new(providers, fn {name, compiled, available} ->
+          {name, %{compiled: compiled, available: available}}
+        end)
+    end
+  end
 
   @doc """
   Run a forward pass through a model.
