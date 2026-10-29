@@ -36,6 +36,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 26 | Runtime-independent ONNX graph summaries |
 | 27 | One-attempt native cancellation controls |
 | 28 | Managed deadlines and caller-exit cancellation |
+| 29 | Dirty-scheduler measurement and policy |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -130,7 +131,6 @@ with separate focused PRs for:
 
 - Per-run profiling toggles require API 25 and remain deferred beyond the API
   17/24 runtime matrix; session profiling is available now.
-- Dirty-scheduler classification under representative concurrent inference.
 
 GPU/NN primitives remain a later or measurement-dependent stage: shared weights
 and pooling, AOT compilation, I/O binding, device allocation, and adapters. Keep

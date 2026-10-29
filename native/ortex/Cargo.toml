@@ -18,6 +18,8 @@ half = "2.2.1"
 
 [features]
 default = ["load-dynamic", "api-17"]
+# Diagnostic-only alternate schedule for bench/schedulers.exs; never in prebuilts.
+benchmark-dirty-cpu = []
 load-dynamic = ["ort/load-dynamic"]
 download-binaries = ["ort/download-binaries", "ort/copy-dylibs", "ort/tls-rustls"]
 tls-rustls = ["ort/tls-rustls"]
