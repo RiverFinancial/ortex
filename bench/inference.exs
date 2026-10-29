@@ -46,19 +46,20 @@ samples =
 
 sorted = Enum.sort(timings)
 
-IO.inspect(
-  %{
-    elixir: System.version(),
-    otp: System.otp_release(),
-    arch: :erlang.system_info(:system_architecture),
-    iterations: iterations,
-    concurrency: concurrency,
-    options: options,
-    serial_calls_per_second: iterations * 1_000_000 / serial_us,
-    concurrent_calls_per_second: iterations * 1_000_000 / concurrent_us,
-    p50_us: Enum.at(sorted, div(iterations, 2)),
-    p99_us: Enum.at(sorted, trunc(iterations * 0.99)),
-    rss_before_bytes: before,
-    rss_samples_bytes: samples,
-    note: "RSS includes BEAM and allocator retention; growth is diagnostic, not proof of a leak."
-  }, pretty: true, limit: :infinity)
+result = %{
+  elixir: System.version(),
+  otp: System.otp_release(),
+  arch: :erlang.system_info(:system_architecture),
+  iterations: iterations,
+  concurrency: concurrency,
+  options: options,
+  serial_calls_per_second: iterations * 1_000_000 / serial_us,
+  concurrent_calls_per_second: iterations * 1_000_000 / concurrent_us,
+  p50_us: Enum.at(sorted, div(iterations, 2)),
+  p99_us: Enum.at(sorted, trunc(iterations * 0.99)),
+  rss_before_bytes: before,
+  rss_samples_bytes: samples,
+  note: "RSS includes BEAM and allocator retention; growth is diagnostic, not proof of a leak."
+}
+
+IO.inspect(result, pretty: true, limit: :infinity)
