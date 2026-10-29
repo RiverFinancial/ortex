@@ -21,3 +21,4 @@ export MIX_ENV=test
 mix clean
 mix test
 mix run --no-start scripts/check_global_pool.exs
+ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_binary_without_runtime.exs
