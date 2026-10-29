@@ -108,3 +108,11 @@ config :ortex, :environment,
 Global-pool sessions reject local thread-count/spinning options unless
 `independent_thread_pool: true` is also supplied. Environment configuration is
 fixed for the VM lifetime. See `Ortex.Environment` and `Ortex.load/2` for options.
+
+## Fork release automation
+
+The release matrix builds and tests all seven targets without installing ONNX
+Runtime at native compilation time. Tagged builds generate checksums, assemble
+a Hex package as a validation artifact, attest the files, and stage a draft
+GitHub release in RiverFinancial/ortex. No workflow publishes to Hex or writes
+to another repository. See [the release instructions](docs/releases.md).
