@@ -80,6 +80,21 @@ defmodule Ortex do
   defdelegate metadata(model), to: Ortex.Model
 
   @doc """
+  Ends session profiling, flushes its Chrome trace JSON, and returns its file path.
+
+  Enable profiling when loading with `profiling: prefix`. Ending profiling waits
+  for any inference holding the session lock; the model remains usable afterward.
+  Returns an empty binary if profiling was not enabled. This session API works at
+  the default API 17 floor. Per-run profiling toggles require runtime API 25 and
+  are not exposed by the current API 17/24 runtime matrix.
+
+      model = Ortex.load("model.onnx", profiling: "/tmp/ortex-profile")
+      Ortex.run(model, inputs)
+      path = Ortex.end_profiling(model)
+  """
+  defdelegate end_profiling(model), to: Ortex.Model
+
+  @doc """
   Reports supported execution providers and their build/runtime availability.
 
   Returns a map from provider atoms to `%{compiled: boolean, available: boolean | nil}`.

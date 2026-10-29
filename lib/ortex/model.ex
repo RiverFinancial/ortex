@@ -67,6 +67,14 @@ defmodule Ortex.Model do
   end
 
   @doc false
+  def end_profiling(%__MODULE__{reference: reference}) do
+    case Ortex.Native.end_profiling(reference) do
+      {:error, message} -> raise message
+      path -> path
+    end
+  end
+
+  @doc false
   def run(model, inputs), do: run(model, inputs, [])
 
   @doc false
