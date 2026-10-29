@@ -37,10 +37,13 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 27 | One-attempt native cancellation controls |
 | 28 | Managed deadlines and caller-exit cancellation |
 | 29 | Dirty-scheduler measurement and policy |
+| 30 | Final lifecycle/managed-run soak and review ledger |
 
-Each PR targets the preceding branch. Merge or retarget in order; the integration
-branch is for validation rather than a replacement broad PR. CI on each branch
-checks that its intermediate state works independently.
+Each PR targets the preceding branch. Merge in order with merge commits to
+preserve ancestry. If using squash/rebase merges, rebase and retarget the remaining
+stack and rerun its checks before proceeding. The integration branch combines
+validation rather than replacing the small PRs. CI checks each intermediate state.
+Task commits are unsigned because the local signing agent cancelled requests.
 
 ## Integration gates
 
@@ -87,24 +90,36 @@ redundant native clone changed median latency from 121 to 85 microseconds for a
 reused resource and 207 to 166 microseconds from BinaryBackend. These are local
 diagnostics, not cross-platform latency guarantees or a raw-binary zero-copy claim.
 
-`bench/lifecycle.exs` validates golden scores on each repeated run and each model
-loaded by a short-lived owner process. A local Apple silicon run exercised 100,000
-runs plus 1,000 alternating file/memory load/disposal cycles per runtime:
+`bench/lifecycle.exs` checks golden scores through ordinary runs, alternating
+file/memory load-disposal owners, and optional bounded runs. The final Apple
+silicon run used 100,000 ordinary runs, 1,000 load/disposal cycles, and 100,000
+managed bounded calls on each runtime:
 
-| Runtime | Warmup RSS | Maximum run RSS | Final load/disposal RSS |
-| --- | --- | --- | --- |
-| 1.17.3 | 104,005,632 | 104,759,296 | 103,596,032 |
-| 1.24.4 | 109,608,960 | 110,346,240 | 109,297,664 |
+```sh
+ORTEX_BUILD=true MIX_ENV=test mix run bench/lifecycle.exs 100000 1000 100000
+```
 
-These byte counts include BEAM and allocator retention. The bounded samples do
-not show sustained growth for this synthetic CPU workload; they do not prove the
-absence of leaks in other graphs, providers, or runtime versions. Run this script
-against any production-representative fixtures before changing a consumer.
+| Runtime | Warmup RSS | Maximum ordinary-run RSS | Final disposal RSS | Bounded RSS min/max | Final bounded RSS |
+| --- | --- | --- | --- | --- | --- |
+| 1.17.3 | 105,185,280 | 105,742,336 | 104,677,376 | 102,825,984 / 104,153,088 | 103,038,976 |
+| 1.24.4 | 107,577,344 | 108,003,328 | 107,003,904 | 105,299,968 / 106,496,000 | 105,299,968 |
+
+Sampled BEAM process counts stayed at 124 throughout. The harness uses
+`Enum.each`, discarding per-call results; collecting comprehensions in an earlier
+diagnostic retained an accumulator and distorted heap/native-memory observations.
+Temporary lifetime counters independently showed controls being reclaimed and
+were removed before the final run. No production native code changed for this
+harness correction.
+
+Byte counts include BEAM and allocator retention. These samples show no sustained
+growth for the exercised synthetic CPU workload, including managed worker/control
+ownership; they do not prove leak freedom for other graphs, providers, or runtime
+versions. Repeat with production-representative fixtures before consumer rollout.
 
 The separate global-pool VM exercises **both** file and memory constructors:
 inherited pools, rejected ignored settings, explicit independent pools, unchanged
 scores, and resource survival through application restart. The precompiled check
-runs these same gates with cargo/rustc replaced by failing stubs.
+runs these same gates with cargo/rustc/protoc replaced by failing stubs.
 
 Separate runtime-log VMs configure info and warning levels before the one-time
 environment initialization. They assert per-session log IDs from both constructors,
@@ -122,15 +137,17 @@ application restarts. Legacy positional loading keeps its CPU defaults.
 CI covers API 17/runtime 1.17.3, API 17/runtime 1.24.4, API 24/runtime 1.24.4,
 both Alpine architectures, all seven NIF targets, and complete checksum/package
 assembly. PR checks and workflow artifacts are the current evidence; a test count
-alone does not prove those platform or constructor combinations passed.
+alone does not prove those platform or constructor combinations passed. The final
+validation PR records exact integration run links without requiring a release tag.
+Runtime cancellation is cooperative and may finish after the caller deadline.
+Accelerator runtime execution remains unvalidated without its libraries/hardware.
 
-## Remaining work
+## Deferred scope
 
-The initial runtime/build foundation is not the whole capability backlog. Continue
-with separate focused PRs for:
-
-- Per-run profiling toggles require API 25 and remain deferred beyond the API
-  17/24 runtime matrix; session profiling is available now.
+The stack covers the selected CPU/API 17–24 modernization, session/environment
+controls, I/O values, metadata/graph inspection, observability, cancellation, and
+Nx support decisions. Per-run profiling toggles require API 25 and remain outside
+the tested runtime matrix; session profiling is available now.
 
 GPU/NN primitives remain a later or measurement-dependent stage: shared weights
 and pooling, AOT compilation, I/O binding, device allocation, and adapters. Keep
