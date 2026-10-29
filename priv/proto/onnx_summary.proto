@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: Apache-2.0
+// Wire-compatible summary subset of ONNX 1.20.1 onnx-ml.proto.
+// Source: https://github.com/onnx/onnx/blob/v1.20.1/onnx/onnx-ml.proto
+// Unneeded fields (including tensor payloads) remain unknown protobuf fields.
+syntax = "proto2";
+package onnx;
+message StringStringEntryProto { optional string key = 1; optional string value = 2; }
+message OperatorSetIdProto { optional string domain = 1; optional int64 version = 2; }
+message TensorProto {
+  repeated int64 dims = 1;
+  optional int32 data_type = 2;
+  optional string name = 8;
+  repeated StringStringEntryProto external_data = 13;
+  optional int32 data_location = 14;
+}
+message SparseTensorProto {
+  optional TensorProto values = 1;
+  optional TensorProto indices = 2;
+  repeated int64 dims = 3;
+}
+message AttributeProto {
+  optional string name = 1;
+  optional GraphProto g = 6;
+  repeated GraphProto graphs = 11;
+}
+message NodeProto {
+  optional string name = 3;
+  optional string op_type = 4;
+  repeated AttributeProto attribute = 5;
+  optional string domain = 7;
+}
+message GraphProto {
+  repeated NodeProto node = 1;
+  optional string name = 2;
+  repeated TensorProto initializer = 5;
+  repeated SparseTensorProto sparse_initializer = 15;
+}
+message FunctionProto {
+  optional string name = 1;
+  repeated NodeProto node = 7;
+  repeated OperatorSetIdProto opset_import = 9;
+  optional string domain = 10;
+  repeated AttributeProto attribute_proto = 11;
+  optional string overload = 13;
+}
+message ModelProto {
+  optional int64 ir_version = 1;
+  optional string producer_name = 2;
+  optional string producer_version = 3;
+  optional string domain = 4;
+  optional int64 model_version = 5;
+  optional GraphProto graph = 7;
+  repeated OperatorSetIdProto opset_import = 8;
+  repeated FunctionProto functions = 25;
+}

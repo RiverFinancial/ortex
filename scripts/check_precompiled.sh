@@ -8,10 +8,10 @@ unset ORTEX_BUILD RUSTLER_PRECOMPILED_FORCE_BUILD_ALL
 elixir scripts/checksums.exs "$artifact_dir"
 stub_dir=$(mktemp -d)
 trap 'rm -rf "$stub_dir"' EXIT
-for compiler in cargo rustc; do
+for compiler in cargo rustc protoc; do
   cat > "$stub_dir/$compiler" <<'STUB'
 #!/bin/sh
-echo 'ERROR: precompiled test attempted Rust compilation' >&2
+echo 'ERROR: precompiled test attempted compiler execution' >&2
 exit 99
 STUB
   chmod +x "$stub_dir/$compiler"
@@ -22,6 +22,7 @@ mix clean
 mix test
 mix run --no-start scripts/check_global_pool.exs
 mix run --no-start scripts/check_environment_defaults.exs
+ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_graph_without_runtime.exs
 mix run --no-start scripts/check_runtime_logs.exs info
 mix run --no-start scripts/check_runtime_logs.exs warning
 ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so mix run --no-start scripts/check_binary_without_runtime.exs
