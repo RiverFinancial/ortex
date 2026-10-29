@@ -35,6 +35,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 25 | Numeric storage and Serving support contract |
 | 26 | Runtime-independent ONNX graph summaries |
 | 27 | One-attempt native cancellation controls |
+| 28 | Managed deadlines and caller-exit cancellation |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -54,7 +55,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 206 checks, with two optional ResNet checks
+The assembled stack currently has 216 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -127,7 +128,6 @@ alone does not prove those platform or constructor combinations passed.
 The initial runtime/build foundation is not the whole capability backlog. Continue
 with separate focused PRs for:
 
-- Managed timeout and caller-exit handling around native cancellation.
 - Per-run profiling toggles require API 25 and remain deferred beyond the API
   17/24 runtime matrix; session profiling is available now.
 - Dirty-scheduler classification under representative concurrent inference.

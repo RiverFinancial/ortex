@@ -11,7 +11,8 @@ defmodule Ortex.Telemetry do
   `:providers`, and `:optimization_level`. A `nil` provider option means that
   the session inherits environment providers. Successful loads add the opaque
   `:model` reference. Run metadata includes the model reference, `:tag`,
-  `:selected_outputs`, and `:inputs` summaries; successful runs add `:outputs`.
+  `:selected_outputs`, `:timeout`, `:cancellable`, and `:inputs` summaries;
+  successful runs add `:outputs`.
   Summaries include tensor shapes/dtypes or container kind/size, without tensor
   values or model bytes. Named I/O summaries use binary keys; positional ones
   use lists in argument/result order.
@@ -39,6 +40,8 @@ defmodule Ortex.Telemetry do
       model: model.reference,
       tag: options.tag,
       selected_outputs: options.outputs,
+      timeout: options.timeout,
+      cancellable: options.control != nil or options.timeout != :infinity,
       inputs: summarize(inputs)
     }
 

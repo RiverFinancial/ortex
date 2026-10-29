@@ -228,7 +228,8 @@ fn take_runtime_logs(
 
 rustler::init!("Elixir.Ortex.Native");
 
-#[rustler::nif(schedule = "DirtyIo")]
+// Option preparation must not queue behind inference's dirty-I/O mutex waits.
+#[rustler::nif(schedule = "DirtyCpu")]
 fn new_run_control(
     model: ResourceArc<model::OrtexModel>,
     options: model::InferenceOptions,

@@ -179,6 +179,15 @@ defmodule Ortex do
   different process to cancel the inference attempt. Its immutable output/tag
   options replace per-call `:outputs`/`:tag`, which cannot be passed alongside it.
 
+  `:timeout` accepts milliseconds (0 through 4_294_967_295) or `:infinity`
+  (default). Finite deadlines and explicit controls use a monitored worker;
+  caller exit or timeout requests native termination. Deadlines include input
+  transfer, session-mutex waiting, inference, and result conversion, after option
+  and control preparation. Timeout raises `Ortex.TimeoutError` and bounds the
+  caller's wait; native termination is cooperative, so a running kernel may
+  finish later and hold the session until it returns. Ordinary unbounded calls
+  without a control keep their synchronous execution path.
+
       Ortex.run(model, %{"features" => features}, outputs: ["scores"], tag: "risk-score")
   """
   defdelegate run(model, tensors, opts), to: Ortex.Model
