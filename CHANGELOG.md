@@ -6,6 +6,7 @@
 - Add explicit environment ownership, mutex-protected sessions, and safe binary decoding.
 - Expose validated session options and shared environment thread pools.
 - Load ONNX bytes directly with the copying constructor and normal session options.
+- Inspect structured I/O types, symbolic dimensions, model fields, and custom properties.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 

@@ -22,7 +22,7 @@ impl std::panic::RefUnwindSafe for OrtexEnvironment {}
 impl Resource for OrtexEnvironment {}
 
 pub struct OrtexModel {
-    session: Mutex<Session>,
+    pub(crate) session: Mutex<Session>,
     // Metadata is immutable and does not need to wait for an inference lock.
     inputs: Description,
     outputs: Description,

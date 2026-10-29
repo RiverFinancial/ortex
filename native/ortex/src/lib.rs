@@ -5,6 +5,7 @@
 //! directly.
 
 mod constants;
+mod metadata;
 mod model;
 mod tensor;
 mod utils;
@@ -37,6 +38,11 @@ fn init_from_memory(
     model::init_from_memory(env, bytes.as_slice(), environment, options)
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn metadata<'a>(env: Env<'a>, model: ResourceArc<model::OrtexModel>) -> NifResult<Term<'a>> {
+    metadata::get(env, model)
 }
 
 #[rustler::nif]
