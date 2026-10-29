@@ -6,9 +6,9 @@ use ndarray::{ArrayD, IxDyn};
 
 use rustler::types::Binary;
 use rustler::ResourceArc;
-use rustler::{Atom, Env, NifResult};
+use rustler::{Env, NifResult};
 
-use ort::{ep::ExecutionProviderDispatch, session::builder::GraphOptimizationLevel};
+use ort::session::builder::GraphOptimizationLevel;
 
 // BEAM sub-binaries are not guaranteed to be aligned. Decode into owned storage
 // rather than manufacturing a mutable ndarray view over an immutable binary.
@@ -71,49 +71,6 @@ pub fn to_binary<'a>(
     _limit: usize,
 ) -> NifResult<Binary<'a>> {
     Ok(reference.make_binary(env, |x| x.to_bytes()))
-}
-
-/// Takes a vec of Atoms and transforms them into a vec of ExecutionProvider Enums
-pub fn map_eps(
-    env: rustler::env::Env,
-    eps: Vec<Atom>,
-    fail: bool,
-) -> Result<Vec<ExecutionProviderDispatch>, ort::Error> {
-    eps.iter()
-        .map(|e| {
-            let name = e
-                .to_term(env)
-                .atom_to_string()
-                .map_err(|_| ort::Error::new("invalid provider atom"))?;
-            let provider = match name.as_str() {
-                "cpu" => ort::ep::CPU::default().build(),
-                #[cfg(feature = "cuda")]
-                "cuda" => ort::ep::CUDA::default().build(),
-                #[cfg(feature = "tensorrt")]
-                "tensorrt" => ort::ep::TensorRT::default().build(),
-                #[cfg(feature = "coreml")]
-                "coreml" => ort::ep::CoreML::default().build(),
-                #[cfg(feature = "directml")]
-                "directml" => ort::ep::DirectML::default().build(),
-                #[cfg(feature = "acl")]
-                "acl" => ort::ep::ACL::default().build(),
-                #[cfg(feature = "onednn")]
-                "onednn" => ort::ep::OneDNN::default().build(),
-                #[cfg(feature = "rocm")]
-                "rocm" => ort::ep::ROCm::default().build(),
-                _ => {
-                    return Err(ort::Error::new(format!(
-                        "unknown or uncompiled execution provider: {name}"
-                    )))
-                }
-            };
-            Ok(if fail {
-                provider.error_on_failure()
-            } else {
-                provider
-            })
-        })
-        .collect()
 }
 
 /// Take an optimization level and returns the

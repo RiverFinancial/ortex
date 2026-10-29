@@ -27,6 +27,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 17 | Borrowed aligned native inputs |
 | 18 | Longer inference and load/disposal diagnostic |
 | 19 | Public load/run telemetry |
+| 20 | Provider configuration and availability |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -46,7 +47,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 173 checks, with two optional ResNet checks
+The assembled stack currently has 179 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -63,6 +64,10 @@ String checks cover Unicode, empty strings/tensors, matrix and scalar shapes,
 memory ownership, malformed inputs at both API layers, and numeric/bool scalars.
 Telemetry checks assert start/stop/exception contracts, file/memory load metadata,
 named selected outputs, model references, durations, tags, and shape summaries.
+Provider checks cover CPU arena options through both constructors, malformed and
+unknown options, uncompiled-provider errors, and build/runtime availability.
+All accelerator feature mappings are compile-checked together; accelerator runtime
+execution still needs its corresponding libraries and hardware.
 Borrowed-input tests retain resources across owner exit, concurrent reuse, slicing,
 and temporary boolean conversion. Raw BEAM binaries still take a validated aligned
 copy; `TensorRef` borrows native storage only until synchronous inference returns.
@@ -103,7 +108,7 @@ The initial runtime/build foundation is not the whole capability backlog. Contin
 with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
-- EP-specific configuration and availability checks; further environment controls.
+- Further environment controls and model dimension overrides.
 - Runtime logging bridge and run-level profiling.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.
 - An explicit decision for the partial Nx backend and Serving support.

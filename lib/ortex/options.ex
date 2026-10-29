@@ -32,7 +32,7 @@ defmodule Ortex.Options do
       valid =
         case key do
           :providers ->
-            is_list(value) and Enum.all?(value, &is_atom/1)
+            is_list(value) and Enum.all?(value, &valid_provider?/1)
 
           :optimization_level ->
             is_integer(value) and value in 0..3
@@ -56,6 +56,18 @@ defmodule Ortex.Options do
 
     {environment, Map.merge(@defaults, Map.new(opts))}
   end
+
+  defp valid_provider?(provider) when is_atom(provider), do: true
+
+  defp valid_provider?({provider, options})
+       when is_atom(provider) and is_map(options) and not is_struct(options) do
+    Enum.all?(options, fn {key, value} ->
+      is_binary(key) and key != "" and String.valid?(key) and not String.contains?(key, <<0>>) and
+        is_binary(value) and String.valid?(value) and not String.contains?(value, <<0>>)
+    end)
+  end
+
+  defp valid_provider?(_), do: false
 
   def legacy!(providers, optimization) when is_list(providers) and is_integer(optimization) do
     validate!(

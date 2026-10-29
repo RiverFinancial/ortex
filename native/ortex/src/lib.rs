@@ -7,6 +7,7 @@
 mod constants;
 mod metadata;
 mod model;
+mod providers;
 mod tensor;
 mod utils;
 mod values;
@@ -44,6 +45,13 @@ fn init_from_memory(
 #[rustler::nif(schedule = "DirtyIo")]
 fn metadata<'a>(env: Env<'a>, model: ResourceArc<model::OrtexModel>) -> NifResult<Term<'a>> {
     metadata::get(env, model)
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn execution_providers(
+    _environment: ResourceArc<model::OrtexEnvironment>,
+) -> NifResult<Vec<(Atom, bool, Option<bool>)>> {
+    providers::status().map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
 #[rustler::nif]
