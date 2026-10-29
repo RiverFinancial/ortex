@@ -30,6 +30,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 20 | Provider configuration and availability |
 | 21 | Symbolic dimension overrides |
 | 22 | Session profiling trace retrieval |
+| 23 | Bounded runtime log bridge |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -49,7 +50,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 186 checks, with two optional ResNet checks
+The assembled stack currently has 188 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -99,6 +100,13 @@ inherited pools, rejected ignored settings, explicit independent pools, unchange
 scores, and resource survival through application restart. The precompiled check
 runs these same gates with cargo/rustc replaced by failing stubs.
 
+Separate runtime-log VMs configure info and warning levels before the one-time
+environment initialization. They assert per-session log IDs from both constructors,
+application restart delivery, and a 256-entry native queue with counted overflow.
+Callbacks enqueue strings only; the BEAM environment process drains them into
+Logger. Each string field is bounded at 16 KiB with a UTF-8-safe truncation marker.
+The environment resource is V2; upgrades require a fresh VM.
+
 CI covers API 17/runtime 1.17.3, API 17/runtime 1.24.4, API 24/runtime 1.24.4,
 both Alpine architectures, all seven NIF targets, and complete checksum/package
 assembly. PR checks and workflow artifacts are the current evidence; a test count
@@ -111,8 +119,8 @@ with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
 - Further environment controls.
-- Runtime logging bridge. Per-run profiling toggles require API 25 and remain
-  deferred beyond the API 17/24 runtime matrix; session profiling is available now.
+- Per-run profiling toggles require API 25 and remain deferred beyond the API
+  17/24 runtime matrix; session profiling is available now.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.
 - An explicit decision for the partial Nx backend and Serving support.
 - Dirty-scheduler classification under representative concurrent inference.

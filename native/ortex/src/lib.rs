@@ -8,6 +8,7 @@ mod constants;
 mod metadata;
 mod model;
 mod providers;
+mod runtime_logs;
 mod tensor;
 mod utils;
 mod values;
@@ -196,9 +197,30 @@ pub fn concatenate(
 fn environment(
     options: Option<model::PoolOptions>,
 ) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
-    model::environment(options)
+    model::environment(options, None)
         .map(ResourceArc::new)
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn environment_with_logs(
+    options: Option<model::PoolOptions>,
+    log_level: Option<i32>,
+) -> NifResult<ResourceArc<model::OrtexEnvironment>> {
+    model::environment(options, log_level)
+        .map(ResourceArc::new)
+        .map_err(|e| rustler::Error::Term(Box::new(e)))
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn take_runtime_logs(
+    environment: ResourceArc<model::OrtexEnvironment>,
+) -> (runtime_logs::Entries, usize) {
+    environment
+        .logs
+        .as_ref()
+        .map(|logs| logs.drain())
+        .unwrap_or_default()
 }
 
 rustler::init!("Elixir.Ortex.Native");

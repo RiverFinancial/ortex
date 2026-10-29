@@ -16,10 +16,11 @@
 - Configure provider option maps and query compiled/runtime provider availability.
 - Specialize symbolic model dimensions with validated session overrides.
 - Flush session profiling traces and retrieve their path with `end_profiling/1`.
+- Optionally forward runtime log messages through a bounded environment queue to Logger.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
 - Build and validate all seven artifacts, checksum maps, and a package in CI.
 - Stage attested draft releases only in RiverFinancial/ortex; no Hex publisher.
 
-Upgrade in a fresh VM; native resource layouts changed.
+Upgrade in a fresh VM; native resource layouts changed (including environment V2).

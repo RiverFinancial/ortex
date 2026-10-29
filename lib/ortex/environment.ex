@@ -15,13 +15,28 @@ defmodule Ortex.Environment do
   Changing environment configuration requires a fresh VM. `get/0` returns the
   environment handle for explicit `Ortex.load(path, environment: env)` calls.
   Set `ORT_DYLIB_PATH` before starting the VM to select the runtime shared library.
+
+  Set `runtime_logging: true` and optionally `runtime_log_level: :info` in the
+  environment config to forward runtime logs into Elixir Logger. Levels are
+  `:debug`, `:info`, `:warning` (default), `:error`, and `:critical`. A bounded
+  native queue is drained every 100 ms. It holds 256 entries; each field is
+  truncated after 16 KiB at a UTF-8 boundary. Overflow drops new entries and is
+  reported as a warning when drained. Logger metadata includes `:ort_category`,
+  `:ort_log_id`, and `:ort_code_location`. Logging is disabled by default.
+
+  The queue is owned by the retained environment and survives application
+  restart. Native resource layout V2 requires a fresh VM after upgrading.
   """
   use GenServer
+  require Logger
   @enforce_keys [:reference]
-  defstruct [:reference]
+  defstruct [:reference, runtime_logging: false]
 
   @doc "Returns this VM's environment handle."
   def get, do: GenServer.call(__MODULE__, :get)
+
+  @doc "Drains buffered runtime logs into Logger synchronously."
+  def flush_logs, do: GenServer.call(__MODULE__, :flush_logs)
 
   @doc false
   def start_link(_opts), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
@@ -42,18 +57,28 @@ defmodule Ortex.Environment do
                 Map.new(opts[:global_thread_pool])
               )
 
-        case Ortex.Native.environment(pool) do
+        logging = Keyword.get(opts, :runtime_logging, false)
+
+        level =
+          if logging,
+            do:
+              Enum.find_index(
+                [:debug, :info, :warning, :error, :critical],
+                &(&1 == Keyword.get(opts, :runtime_log_level, :warning))
+              )
+
+        case Ortex.Native.environment_with_logs(pool, level) do
           {:error, message} ->
             {:stop, message}
 
           reference ->
-            environment = %__MODULE__{reference: reference}
+            environment = %__MODULE__{reference: reference, runtime_logging: logging}
             :persistent_term.put(key, {opts, environment})
-            {:ok, environment}
+            ready(environment)
         end
 
       {^opts, environment} ->
-        {:ok, environment}
+        ready(environment)
 
       _ ->
         {:stop, "Ortex environment configuration changed; restart the VM"}
@@ -63,10 +88,61 @@ defmodule Ortex.Environment do
   @impl true
   def handle_call(:get, _from, environment), do: {:reply, environment, environment}
 
-  defp validate!(opts) do
-    unless Keyword.keyword?(opts) and Keyword.keys(opts) in [[], [:global_thread_pool]] do
-      raise ArgumentError, "expected environment options: global_thread_pool: keyword_list"
+  def handle_call(:flush_logs, _from, environment) do
+    flush(environment)
+    {:reply, :ok, environment}
+  end
+
+  @impl true
+  def handle_info(:flush_runtime_logs, environment) do
+    flush(environment)
+    schedule(environment)
+    {:noreply, environment}
+  end
+
+  defp ready(environment) do
+    schedule(environment)
+    {:ok, environment}
+  end
+
+  defp schedule(%{runtime_logging: true}),
+    do: Process.send_after(self(), :flush_runtime_logs, 100)
+
+  defp schedule(_), do: :ok
+
+  defp flush(environment) do
+    {entries, dropped} = Ortex.Native.take_runtime_logs(environment.reference)
+
+    for {level, category, id, location, message} <- entries do
+      Logger.log(level, "ONNX Runtime: " <> message,
+        ort_category: category,
+        ort_log_id: id,
+        ort_code_location: location
+      )
     end
+
+    if dropped > 0, do: Logger.warning("ONNX Runtime log buffer dropped #{dropped} messages")
+  end
+
+  defp validate!(opts) do
+    unless Keyword.keyword?(opts) and
+             length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) and
+             Keyword.keys(opts) -- [:global_thread_pool, :runtime_logging, :runtime_log_level] ==
+               [] do
+      raise ArgumentError, "invalid Ortex environment options"
+    end
+
+    unless is_boolean(Keyword.get(opts, :runtime_logging, false)),
+      do: raise(ArgumentError, "runtime_logging must be a boolean")
+
+    unless Keyword.get(opts, :runtime_log_level, :warning) in [
+             :debug,
+             :info,
+             :warning,
+             :error,
+             :critical
+           ],
+           do: raise(ArgumentError, "invalid runtime_log_level")
 
     if pool = opts[:global_thread_pool] do
       unless Keyword.keyword?(pool) and
