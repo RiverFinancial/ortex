@@ -14,6 +14,7 @@ defmodule Ortex.Options do
     optimized_model_path: nil,
     deterministic_compute: nil,
     memory_pattern: nil,
+    dimension_overrides: %{},
     log_id: nil
   }
 
@@ -42,6 +43,14 @@ defmodule Ortex.Options do
 
           key when key in [:profiling, :optimized_model_path, :log_id] ->
             is_binary(value) and not String.contains?(value, <<0>>)
+
+          :dimension_overrides ->
+            is_map(value) and not is_struct(value) and
+              Enum.all?(value, fn {name, size} ->
+                is_binary(name) and name != "" and String.valid?(name) and
+                  not String.contains?(name, <<0>>) and
+                  is_integer(size) and size >= 0 and size <= 9_223_372_036_854_775_807
+              end)
 
           _ ->
             is_boolean(value)

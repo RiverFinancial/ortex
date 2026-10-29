@@ -14,6 +14,7 @@
 - Borrow aligned native tensor storage during synchronous inference, avoiding an extra input clone.
 - Emit public load/run telemetry spans with durations, model references, tags, and value summaries.
 - Configure provider option maps and query compiled/runtime provider availability.
+- Specialize symbolic model dimensions with validated session overrides.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
