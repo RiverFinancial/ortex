@@ -8,6 +8,7 @@ defmodule Ortex.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      test_ignore_filters: [~r/test\/fixtures\//],
 
       # Docs
       name: "Ortex",

@@ -1,49 +1,39 @@
-name: Test
+name: Source validation
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: source-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    name: Linux ${{ matrix.elixir }}, ${{ matrix.otp }}
+  baseline:
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        elixir: ["1.17.3"]
-        otp: ["27.1.2"]
+        os: [ubuntu-22.04, macos-15]
     env:
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v2
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
-          otp-version: ${{ matrix.otp }}
-          elixir-version: ${{ matrix.elixir }}
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
-
-  macos:
-    runs-on: macos-latest
-    name: macOS
-    env:
-      MIX_ENV: test
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install test runtime
+        run: python scripts/install_runtime.py 1.24.4
+      - name: Use the same dynamic runtime for before/after comparisons
         run: |
-          brew update
-          brew install erlang@27 elixir
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
+          echo 'import Config' > config/ci.exs
+          echo 'config :ortex, Ortex.Native, features: ["ort/load-dynamic"]' >> config/ci.exs
+          echo 'import_config "ci.exs"' >> config/config.exs
+      - run: mix deps.get --check-locked
+      - run: mix test
+      - run: mix run bench/inference.exs 2000 8
