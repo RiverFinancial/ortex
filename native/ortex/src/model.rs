@@ -106,6 +106,7 @@ pub struct SessionOptions {
     optimized_model_path: Option<String>,
     deterministic_compute: Option<bool>,
     memory_pattern: Option<bool>,
+    dimension_overrides: std::collections::HashMap<String, i64>,
     log_id: Option<String>,
 }
 
@@ -156,6 +157,14 @@ fn session_builder(
     }
     if let Some(v) = opts.memory_pattern {
         builder = builder.with_memory_pattern(v)?;
+    }
+    for (name, size) in opts.dimension_overrides {
+        if name.is_empty() || name.contains('\0') || size < 0 {
+            return Err(Error::new(
+                "dimension overrides require non-empty names and non-negative i64 sizes",
+            ));
+        }
+        builder = builder.with_dimension_override(name, size)?;
     }
     if let Some(v) = opts.log_id {
         builder = builder.with_log_id(v)?;

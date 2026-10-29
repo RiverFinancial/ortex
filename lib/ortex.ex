@@ -14,9 +14,14 @@ defmodule Ortex do
   The keyword form accepts `providers`, `optimization_level` (0-3),
   `intra_threads`, `inter_threads`, `parallel_execution`, `intra_op_spinning`,
   `inter_op_spinning`, `independent_thread_pool`, `environment`, `profiling`,
-  `optimized_model_path`, `deterministic_compute`, `memory_pattern`, and `log_id`.
+  `optimized_model_path`, `deterministic_compute`, `memory_pattern`,
+  `dimension_overrides`, and `log_id`.
   Thread counts are non-negative integers; zero leaves selection to the runtime.
   See `Ortex.Environment` for shared global pools.
+
+  `dimension_overrides` maps binary symbolic dimension names to non-negative i64
+  sizes, for example `%{"batch" => 1}`. This specializes free dimensions when
+  creating the session. ONNX Runtime ignores names absent from the graph.
 
   The source build targets API 17 by default and uses `ORT_DYLIB_PATH` to
   find the runtime library. Accelerator providers require explicit Cargo features
