@@ -95,6 +95,10 @@ defmodule Ortex do
   a flat list of UTF-8 binaries with a tuple shape. Numeric scalar tensors retain
   shape `{}` and can be read with `Nx.to_number/1`.
 
+  Numeric inputs borrow aligned Ortex storage until the synchronous run returns.
+  Transferring from another backend still copies into that storage. Reusing a
+  tensor already on `Ortex.Backend` avoids the transfer on subsequent runs.
+
   ## Examples
 
       iex> model = Ortex.load("./models/tinymodel.onnx")

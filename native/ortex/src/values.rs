@@ -23,7 +23,10 @@ impl InputValue {
     pub fn prepare(&self, dtype: &ValueType) -> Result<SessionInputValue<'_>, Error> {
         match self {
             Self::Tensor(input) if is_bool_input(dtype) => {
-                (&(**input).clone().to_bool()?).try_into()
+                let OrtexTensor::bool(array) = input.to_bool()? else {
+                    return Err(Error::new("invalid internal boolean conversion"));
+                };
+                Ok(Tensor::from_array(array)?.into_dyn().into())
             }
             Self::Tensor(input) => (&**input).try_into(),
             Self::Strings((shape, values)) => {

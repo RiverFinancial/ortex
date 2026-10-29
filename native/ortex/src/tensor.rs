@@ -4,7 +4,7 @@ use ndarray::prelude::*;
 use ndarray::{ArrayBase, ArrayView, Data, IxDyn, IxDynImpl, ViewRepr};
 use ort::session::SessionInputValue;
 use ort::{
-    value::{DynValue, Tensor, TensorElementType, ValueType},
+    value::{DynValue, Tensor, TensorElementType, TensorRef, ValueType},
     Error,
 };
 use rustler::Atom;
@@ -191,7 +191,7 @@ impl OrtexTensor {
         }
     }
 
-    pub fn to_bool(self) -> Result<OrtexTensor, Error> {
+    pub fn to_bool(&self) -> Result<OrtexTensor, Error> {
         match self {
             OrtexTensor::u8(y) => {
                 if y.iter().any(|v| *v > 1) {
@@ -291,25 +291,37 @@ impl TryFrom<&DynValue> for OrtexTensor {
     }
 }
 
-impl TryFrom<&OrtexTensor> for SessionInputValue<'_> {
+impl<'a> TryFrom<&'a OrtexTensor> for SessionInputValue<'a> {
     type Error = Error;
-    fn try_from(ort_tensor: &OrtexTensor) -> Result<Self, Self::Error> {
-        let r: DynValue = match ort_tensor {
-            OrtexTensor::s8(arr) => Tensor::from_array(arr.to_owned())?.into_dyn(),
-            OrtexTensor::s16(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::s32(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::s64(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::f16(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::f32(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::f64(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::bf16(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::u8(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::u16(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::u32(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::u64(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-            OrtexTensor::bool(arr) => Tensor::from_array(arr.clone())?.into_dyn(),
-        };
-        Ok(r.into())
+    fn try_from(ort_tensor: &'a OrtexTensor) -> Result<Self, Self::Error> {
+        macro_rules! view {
+            ($arr:expr) => {{
+                if $arr.is_standard_layout() {
+                    TensorRef::from_array_view($arr)?.into_dyn().into()
+                } else {
+                    Tensor::from_array($arr.as_standard_layout().into_owned())?
+                        .into_dyn()
+                        .into()
+                }
+            }};
+        }
+        // The resource's typed allocation stays alive through synchronous run.
+        // Raw BEAM binaries still use the validated aligned copy in from_binary.
+        Ok(match ort_tensor {
+            OrtexTensor::s8(arr) => view!(arr),
+            OrtexTensor::s16(arr) => view!(arr),
+            OrtexTensor::s32(arr) => view!(arr),
+            OrtexTensor::s64(arr) => view!(arr),
+            OrtexTensor::f16(arr) => view!(arr),
+            OrtexTensor::f32(arr) => view!(arr),
+            OrtexTensor::f64(arr) => view!(arr),
+            OrtexTensor::bf16(arr) => view!(arr),
+            OrtexTensor::u8(arr) => view!(arr),
+            OrtexTensor::u16(arr) => view!(arr),
+            OrtexTensor::u32(arr) => view!(arr),
+            OrtexTensor::u64(arr) => view!(arr),
+            OrtexTensor::bool(arr) => view!(arr),
+        })
     }
 }
 

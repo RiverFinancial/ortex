@@ -11,6 +11,7 @@
 - Select and order runtime outputs and assign a per-run log tag with `run/3`.
 - Decode ZipMap classifier probabilities to maps and tensor sequences to lists.
 - Round-trip UTF-8 tensor and scalar strings with `Ortex.StringTensor`.
+- Borrow aligned native tensor storage during synchronous inference, avoiding an extra input clone.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
