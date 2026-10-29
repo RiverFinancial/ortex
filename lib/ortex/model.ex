@@ -54,6 +54,14 @@ defmodule Ortex.Model do
   defp to_model(reference), do: %Ortex.Model{reference: reference}
 
   @doc false
+  def metadata(%__MODULE__{reference: reference}) do
+    case Ortex.Native.metadata(reference) do
+      {:error, message} -> raise message
+      metadata -> metadata
+    end
+  end
+
+  @doc false
   def run(%Ortex.Model{} = model, tensor) when not is_tuple(tensor) do
     run(model, {tensor})
   end

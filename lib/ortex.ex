@@ -46,6 +46,29 @@ defmodule Ortex do
   defdelegate load_from_memory(bytes, opts \\ []), to: Ortex.Model
 
   @doc """
+  Returns model metadata and structured input/output descriptors.
+
+  Each descriptor contains a binary `:name` and a recursive `:type`:
+  `{:tensor, dtype, shape}`, `{:map, key_dtype, value_dtype}`,
+  `{:sequence, type}`, or `{:optional, type}`. Numeric dtypes use Nx tuples,
+  with `:bool` and `:string` for those element types. Unrecognized element types
+  return `{:unsupported, binary_name}`. Tensor shapes are tuples containing
+  integers, binary symbolic names, or `nil` for unnamed dynamic dimensions.
+
+  Model fields are `:name`, `:producer`, `:domain`, `:description`,
+  `:graph_description`, `:version`, and `:custom`. Custom keys and values remain
+  binaries. Optional model fields may be `nil`; runtime-provided empty strings
+  are preserved. Descriptor order follows the graph declaration.
+
+  Describing a type does not imply that `run/2` can convert its values. Map,
+  sequence, optional, string, and boolean values require separate value support.
+
+  This API does not parse a Rust Debug rendering. `Native.show_session/1` keeps
+  its existing format for callers that still use it.
+  """
+  defdelegate metadata(model), to: Ortex.Model
+
+  @doc """
   Run a forward pass through a model.
 
   This takes a model and tuple of `Nx.Tensors`,
