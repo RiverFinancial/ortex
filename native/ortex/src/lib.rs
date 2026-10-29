@@ -96,7 +96,7 @@ fn run_named_with_options(
 fn run_values<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
-    inputs: Vec<ResourceArc<OrtexTensor>>,
+    inputs: Vec<values::InputValue>,
     options: model::InferenceOptions,
 ) -> NifResult<Vec<Term<'a>>> {
     let inputs = model::positional_inputs(&model, inputs)
@@ -110,7 +110,7 @@ fn run_values<'a>(
 fn run_named_values<'a>(
     env: Env<'a>,
     model: ResourceArc<model::OrtexModel>,
-    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+    inputs: Vec<(String, values::InputValue)>,
     options: model::InferenceOptions,
 ) -> NifResult<Vec<(String, Term<'a>)>> {
     model::infer(model, inputs, options, |v| values::decode(env, v))

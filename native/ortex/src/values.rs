@@ -1,18 +1,63 @@
 //! Copy output values into BEAM-owned terms before releasing the session lock.
 use crate::tensor::OrtexTensor;
+use crate::utils::is_bool_input;
+use ort::session::SessionInputValue;
 use ort::value::{
-    DynValue, DynValueTypeMarker, IntoTensorElementType, TensorElementType, ValueType,
+    DynValue, DynValueTypeMarker, IntoTensorElementType, Tensor, TensorElementType, ValueType,
 };
 use ort::Error;
-use rustler::{Encoder, Env, ResourceArc, Term};
+use rustler::{Encoder, Env, NifUntaggedEnum, ResourceArc, Term};
 use std::hash::Hash;
 
 mod atoms {
-    rustler::atoms! { tensor, sequence, map }
+    rustler::atoms! { tensor, sequence, map, string_tensor }
+}
+
+#[derive(NifUntaggedEnum)]
+pub enum InputValue {
+    Tensor(ResourceArc<OrtexTensor>),
+    Strings((Vec<usize>, Vec<String>)),
+}
+
+impl InputValue {
+    pub fn prepare(&self, dtype: &ValueType) -> Result<SessionInputValue<'_>, Error> {
+        match self {
+            Self::Tensor(input) if is_bool_input(dtype) => {
+                (&(**input).clone().to_bool()?).try_into()
+            }
+            Self::Tensor(input) => (&**input).try_into(),
+            Self::Strings((shape, values)) => {
+                let mut count = 1usize;
+                for dim in shape {
+                    if *dim > i64::MAX as usize {
+                        return Err(Error::new("string tensor dimension exceeds i64"));
+                    }
+                    count = count
+                        .checked_mul(*dim)
+                        .ok_or_else(|| Error::new("string tensor shape overflow"))?;
+                }
+                if count != values.len() {
+                    return Err(Error::new("string tensor shape does not match value count"));
+                }
+                Ok(
+                    Tensor::from_string_array((shape.clone(), values.as_slice()))?
+                        .into_dyn()
+                        .into(),
+                )
+            }
+        }
+    }
 }
 
 pub fn decode<'a>(env: Env<'a>, value: &DynValue) -> Result<Term<'a>, Error> {
     match value.dtype() {
+        ValueType::Tensor {
+            ty: TensorElementType::String,
+            ..
+        } => {
+            let (shape, strings) = value.try_extract_strings()?;
+            Ok((atoms::string_tensor(), shape.to_vec(), strings).encode(env))
+        }
         ValueType::Tensor { .. } => {
             let tensor: OrtexTensor = value.try_into()?;
             let shape = tensor.shape();

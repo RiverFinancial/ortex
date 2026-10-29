@@ -61,7 +61,7 @@ defmodule Ortex do
   are preserved. Descriptor order follows the graph declaration.
 
   Describing a type does not imply that `run/2` can convert its values.
-  Optional and string values require separate value support.
+  Optional values require separate value support.
 
   This API does not parse a Rust Debug rendering. `Native.show_session/1` keeps
   its existing format for callers that still use it.
@@ -90,6 +90,10 @@ defmodule Ortex do
   probabilities. Numeric tensors, including scalars, remain Nx tensors;
   boolean tensors use Nx's `{:u, 8}` representation. Non-finite map floats and
   unsupported map element types raise a recoverable error.
+
+  String tensors use `Ortex.StringTensor` for both input and output. Its data is
+  a flat list of UTF-8 binaries with a tuple shape. Numeric scalar tensors retain
+  shape `{}` and can be read with `Nx.to_number/1`.
 
   ## Examples
 

@@ -23,6 +23,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 13 | Named tensor inputs and outputs |
 | 14 | Per-run output selection and tags |
 | 15 | Map and Sequence output values |
+| 16 | String tensors and scalar round-trips |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -42,7 +43,7 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 158 checks, with two optional ResNet checks
+The assembled stack currently has 164 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
@@ -55,6 +56,8 @@ invalid selections/options, and independent concurrent call configuration.
 Value fixtures cover integer/string ZipMap classes, Unicode labels, tensor and
 empty sequences, zero-input graphs, nested value ownership, and non-finite map
 float error recovery. Unsupported map types remain recoverable errors.
+String checks cover Unicode, empty strings/tensors, matrix and scalar shapes,
+memory ownership, malformed inputs at both API layers, and numeric/bool scalars.
 
 The separate global-pool VM exercises **both** file and memory constructors:
 inherited pools, rejected ignored settings, explicit independent pools, unchanged
@@ -72,7 +75,7 @@ The initial runtime/build foundation is not the whole capability backlog. Contin
 with separate focused PRs for:
 
 - Run cancellation, timeout, and caller-exit handling.
-- String tensors, scalar convenience APIs, and borrowed tensor inputs.
+- Borrowed tensor inputs and copy-cost measurements.
 - EP-specific configuration and availability checks; further environment controls.
 - Elixir telemetry, runtime logging bridge, and run-level profiling.
 - ONNX graph summaries from protobuf: versions, operators, initializers, and ZipMap.

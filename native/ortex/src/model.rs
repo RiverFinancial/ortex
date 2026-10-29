@@ -1,6 +1,7 @@
 //! Session resources own their environment and serialize runs through a mutex.
 use crate::tensor::OrtexTensor;
-use crate::utils::{is_bool_input, map_eps, map_opt_level};
+use crate::utils::{map_eps, map_opt_level};
+use crate::values::InputValue;
 use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
 use ort::session::{OutputSelector, RunOptions};
@@ -224,10 +225,7 @@ pub fn run_with_options(
         .map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
 }
 
-pub fn positional_inputs(
-    model: &OrtexModel,
-    inputs: Vec<ResourceArc<OrtexTensor>>,
-) -> Result<Vec<(String, ResourceArc<OrtexTensor>)>, Error> {
+pub fn positional_inputs<T>(model: &OrtexModel, inputs: Vec<T>) -> Result<Vec<(String, T)>, Error> {
     if inputs.len() != model.inputs.len() {
         return Err(Error::new(format!(
             "Expected {} inputs, got {}",
@@ -255,6 +253,10 @@ pub fn run_named_with_options(
     inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
     options: InferenceOptions,
 ) -> Result<NamedOutputs, Error> {
+    let inputs = inputs
+        .into_iter()
+        .map(|(name, input)| (name, InputValue::Tensor(input)))
+        .collect();
     infer(model, inputs, options, |value| {
         let tensor: OrtexTensor = value.try_into()?;
         let shape = tensor.shape();
@@ -265,7 +267,7 @@ pub fn run_named_with_options(
 
 pub fn infer<T>(
     model: ResourceArc<OrtexModel>,
-    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+    inputs: Vec<(String, InputValue)>,
     options: InferenceOptions,
     mut decode: impl FnMut(&DynValue) -> Result<T, Error>,
 ) -> Result<Vec<(String, T)>, Error> {
@@ -291,12 +293,7 @@ pub fn infer<T>(
             .iter()
             .find(|d| d.name() == name)
             .ok_or_else(|| Error::new(format!("Unknown input {name:?}")))?;
-        let input: &OrtexTensor = input;
-        let value = if is_bool_input(descriptor.dtype()) {
-            (&input.clone().to_bool()?).try_into()?
-        } else {
-            input.try_into()?
-        };
+        let value = input.prepare(descriptor.dtype())?;
         values.push((name.clone(), value));
     }
     let names: Vec<String> = options.outputs.unwrap_or_else(|| {
