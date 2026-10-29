@@ -3,9 +3,8 @@
 
 use crate::constants::*;
 use crate::tensor::OrtexTensor;
-use ndarray::{ArrayViewMut, Ix, IxDyn};
-
-use ndarray::ShapeError;
+use ndarray::{ArrayD, IxDyn};
+use std::convert::TryInto;
 
 use rustler::resource::ResourceArc;
 use rustler::types::Binary;
@@ -13,69 +12,53 @@ use rustler::{Atom, Env, NifResult};
 
 use ort::{ExecutionProviderDispatch, GraphOptimizationLevel};
 
-/// A faster (unsafe) way of creating an Array from an Erlang binary
-fn initialize_from_raw_ptr<T>(ptr: *const T, shape: &[Ix]) -> ArrayViewMut<T, IxDyn> {
-    let array = unsafe { ArrayViewMut::from_shape_ptr(shape, ptr as *mut T) };
-    array
-}
-
-/// Given a Binary term, shape, and dtype from the BEAM, constructs an OrtexTensor and
-/// returns the reference to be used as an Nx.Backend representation.
-///
-/// # Example
-///
-/// ```elixir
-/// bin = <<1, 0, 0, 0, 1, 0, 0, 0>>
-/// ```
-///
-/// Create a shape `[2]` u32 OrtexTensor from a binary of 8 bytes
-/// ```elixir
-/// {:ok, reference} = from_binary(bin, {2}, {:u, 32})
-/// ```
+// BEAM sub-binaries are not guaranteed to be aligned. Decode into owned storage
+// rather than manufacturing a mutable ndarray view over an immutable binary.
 pub fn from_binary(
     bin: Binary,
     shape: Vec<usize>,
     dtype_str: String,
     dtype_bits: usize,
-) -> Result<ResourceArc<OrtexTensor>, ShapeError> {
-    match (dtype_str.as_ref(), dtype_bits) {
-        ("bf", 16) => Ok(ResourceArc::new(OrtexTensor::bf16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const half::bf16, &shape).to_owned(),
-        ))),
-        ("f", 16) => Ok(ResourceArc::new(OrtexTensor::f16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const half::f16, &shape).to_owned(),
-        ))),
-        ("f", 32) => Ok(ResourceArc::new(OrtexTensor::f32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const f32, &shape).to_owned(),
-        ))),
-        ("f", 64) => Ok(ResourceArc::new(OrtexTensor::f64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const f64, &shape).to_owned(),
-        ))),
-        ("s", 8) => Ok(ResourceArc::new(OrtexTensor::s8(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i8, &shape).to_owned(),
-        ))),
-        ("s", 16) => Ok(ResourceArc::new(OrtexTensor::s16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i16, &shape).to_owned(),
-        ))),
-        ("s", 32) => Ok(ResourceArc::new(OrtexTensor::s32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i32, &shape).to_owned(),
-        ))),
-        ("s", 64) => Ok(ResourceArc::new(OrtexTensor::s64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const i64, &shape).to_owned(),
-        ))),
-        ("u", 8) => Ok(ResourceArc::new(OrtexTensor::u8(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u8, &shape).to_owned(),
-        ))),
-        ("u", 16) => Ok(ResourceArc::new(OrtexTensor::u16(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u16, &shape).to_owned(),
-        ))),
-        ("u", 32) => Ok(ResourceArc::new(OrtexTensor::u32(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u32, &shape).to_owned(),
-        ))),
-        ("u", 64) => Ok(ResourceArc::new(OrtexTensor::u64(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u64, &shape).to_owned(),
-        ))),
-        (&_, _) => unimplemented!(),
+) -> Result<ResourceArc<OrtexTensor>, String> {
+    let count = shape
+        .iter()
+        .try_fold(1usize, |n, d| n.checked_mul(*d))
+        .ok_or_else(|| "tensor shape overflow".to_owned())?;
+    let bytes = dtype_bits
+        .checked_div(8)
+        .and_then(|size| count.checked_mul(size))
+        .ok_or_else(|| "tensor byte size overflow".to_owned())?;
+    if bytes != bin.len() {
+        return Err("binary size does not match tensor shape and type".to_owned());
+    }
+    macro_rules! decode {
+        ($ty:ty, $variant:ident, $convert:expr) => {{
+            let data = bin
+                .as_slice()
+                .chunks_exact(std::mem::size_of::<$ty>())
+                .map(|chunk| {
+                    let v = <$ty>::from_ne_bytes(chunk.try_into().expect("fixed-size chunk"));
+                    ($convert)(v)
+                })
+                .collect();
+            let array = ArrayD::from_shape_vec(IxDyn(&shape), data).map_err(|e| e.to_string())?;
+            Ok(ResourceArc::new(OrtexTensor::$variant(array)))
+        }};
+    }
+    match (dtype_str.as_str(), dtype_bits) {
+        ("bf", 16) => decode!(u16, bf16, half::bf16::from_bits),
+        ("f", 16) => decode!(u16, f16, half::f16::from_bits),
+        ("f", 32) => decode!(f32, f32, |v| v),
+        ("f", 64) => decode!(f64, f64, |v| v),
+        ("s", 8) => decode!(i8, s8, |v| v),
+        ("s", 16) => decode!(i16, s16, |v| v),
+        ("s", 32) => decode!(i32, s32, |v| v),
+        ("s", 64) => decode!(i64, s64, |v| v),
+        ("u", 8) => decode!(u8, u8, |v| v),
+        ("u", 16) => decode!(u16, u16, |v| v),
+        ("u", 32) => decode!(u32, u32, |v| v),
+        ("u", 64) => decode!(u64, u64, |v| v),
+        _ => Err("unsupported tensor type".to_owned()),
     }
 }
 
