@@ -28,6 +28,8 @@ defmodule Ortex do
   and a matching runtime. Unknown or uncompiled providers raise. Keyword calls
   fail on provider registration errors unless `error_on_failure: false` is set.
   Positional arities preserve legacy optimization and registration behavior.
+  Keyword loading inherits environment providers when this option is omitted;
+  an explicit provider list replaces the environment defaults.
 
   Provider entries may be atoms or `{provider, %{binary_key => binary_value}}`
   tuples, in descending priority. For example,

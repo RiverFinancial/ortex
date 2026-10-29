@@ -16,6 +16,14 @@ defmodule Ortex.Environment do
   environment handle for explicit `Ortex.load(path, environment: env)` calls.
   Set `ORT_DYLIB_PATH` before starting the VM to select the runtime shared library.
 
+  `:name` sets the environment log name (default `"Ortex"`). `:runtime_path`
+  selects a dynamic runtime library ahead of `ORT_DYLIB_PATH`. `:providers`
+  configures default provider atoms/option maps, with strict registration.
+  Keyword sessions inherit these providers when `:providers` is omitted; an
+  explicit list replaces them, including `[]` to request runtime CPU fallback.
+  Positional loading keeps its explicit CPU/provider defaults. Without configured
+  providers the environment defaults to `[:cpu]`, preserving CPU arena behavior.
+
   Set `runtime_logging: true` and optionally `runtime_log_level: :info` in the
   environment config to forward runtime logs into Elixir Logger. Levels are
   `:debug`, `:info`, `:warning` (default), `:error`, and `:critical`. A bounded
@@ -67,7 +75,15 @@ defmodule Ortex.Environment do
                 &(&1 == Keyword.get(opts, :runtime_log_level, :warning))
               )
 
-        case Ortex.Native.environment_with_logs(pool, level) do
+        options = %{
+          global_thread_pool: pool,
+          log_level: level,
+          name: Keyword.get(opts, :name, "Ortex"),
+          runtime_path: opts[:runtime_path],
+          providers: Keyword.get(opts, :providers, [:cpu])
+        }
+
+        case Ortex.Native.environment_with_options(options) do
           {:error, message} ->
             {:stop, message}
 
@@ -127,7 +143,15 @@ defmodule Ortex.Environment do
   defp validate!(opts) do
     unless Keyword.keyword?(opts) and
              length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) and
-             Keyword.keys(opts) -- [:global_thread_pool, :runtime_logging, :runtime_log_level] ==
+             Keyword.keys(opts) --
+               [
+                 :global_thread_pool,
+                 :runtime_logging,
+                 :runtime_log_level,
+                 :name,
+                 :runtime_path,
+                 :providers
+               ] ==
                [] do
       raise ArgumentError, "invalid Ortex environment options"
     end
@@ -143,6 +167,17 @@ defmodule Ortex.Environment do
              :critical
            ],
            do: raise(ArgumentError, "invalid runtime_log_level")
+
+    for key <- [:name, :runtime_path], Keyword.has_key?(opts, key) do
+      value = opts[key]
+
+      unless is_binary(value) and value != "" and String.valid?(value) and
+               not String.contains?(value, <<0>>),
+             do: raise(ArgumentError, "invalid environment #{key}")
+    end
+
+    if Keyword.has_key?(opts, :providers),
+      do: Ortex.Options.validate!(providers: opts[:providers])
 
     if pool = opts[:global_thread_pool] do
       unless Keyword.keyword?(pool) and

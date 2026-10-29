@@ -16,6 +16,14 @@ on provider registration errors by default. `error_on_failure: false` explicitly
 permits runtime fallback after a registration failure; it does not suppress invalid
 Ortex configuration. Positional loading retains its legacy registration behavior.
 
+Set `config :ortex, :environment, providers: [...]` before startup for VM-wide
+defaults. Keyword calls inherit them when `:providers` is omitted. Explicit
+session provider lists replace the defaults, rather than appending them; `[]`
+suppresses environment providers and allows ONNX Runtime's CPU fallback. Inherited
+environment providers register strictly. To configure session fallback explicitly,
+supply the session provider list with `error_on_failure: false`. Positional calls
+retain their explicit provider arguments and CPU defaults.
+
 The precompiled NIFs support CPU registration. Accelerator providers need a source
 build with the matching Cargo feature, a matching runtime library, dependencies,
 and hardware. Setting a feature does not install its runtime/device dependencies.

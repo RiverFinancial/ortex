@@ -1,7 +1,7 @@
 defmodule Ortex.Options do
   @moduledoc false
   @defaults %{
-    providers: [:cpu],
+    providers: nil,
     optimization_level: 3,
     error_on_failure: true,
     intra_threads: nil,

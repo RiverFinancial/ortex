@@ -55,6 +55,7 @@ jobs:
       - run: mix compile --warnings-as-errors
       - run: mix test
       - run: mix run --no-start scripts/check_global_pool.exs
+      - run: mix run --no-start scripts/check_environment_defaults.exs
       - name: Verify runtime Logger bridge and bounded overflow
         run: |
           mix run --no-start scripts/check_runtime_logs.exs info

@@ -49,16 +49,49 @@ pub struct PoolOptions {
     spinning: Option<bool>,
 }
 
-pub fn environment(
-    options: Option<PoolOptions>,
+#[derive(NifMap)]
+pub struct EnvironmentOptions {
+    global_thread_pool: Option<PoolOptions>,
     log_level: Option<i32>,
-) -> Result<OrtexEnvironment, String> {
-    let level = log_level.map(crate::runtime_logs::level).transpose()?;
+    name: String,
+    runtime_path: Option<String>,
+    providers: Vec<ProviderConfig>,
+}
+
+impl EnvironmentOptions {
+    pub fn legacy(pool: Option<PoolOptions>, log_level: Option<i32>) -> Self {
+        Self {
+            global_thread_pool: pool,
+            log_level,
+            name: "Ortex".into(),
+            runtime_path: None,
+            providers: vec![ProviderConfig::Name(crate::constants::ortex_atoms::cpu())],
+        }
+    }
+}
+
+pub fn environment(env: Env, config: EnvironmentOptions) -> Result<OrtexEnvironment, String> {
+    if config.name.is_empty()
+        || config.name.contains('\0')
+        || config
+            .runtime_path
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.contains('\0'))
+    {
+        return Err("environment name and runtime path must be non-empty without NUL bytes".into());
+    }
+    let options = config.global_thread_pool;
+    let level = config
+        .log_level
+        .map(crate::runtime_logs::level)
+        .transpose()?;
     let global_pool = options.is_some();
     #[cfg(feature = "load-dynamic")]
     let builder = {
-        let path = std::env::var_os("ORT_DYLIB_PATH")
-            .filter(|value| !value.is_empty())
+        let path = config
+            .runtime_path
+            .map(std::ffi::OsString::from)
+            .or_else(|| std::env::var_os("ORT_DYLIB_PATH").filter(|value| !value.is_empty()))
             .unwrap_or_else(|| {
                 format!(
                     "{}onnxruntime{}",
@@ -71,11 +104,18 @@ pub fn environment(
             .map_err(|e| format!("Failed to load ONNX Runtime: {e}"))?
     };
     #[cfg(not(feature = "load-dynamic"))]
-    let builder = ort::init();
+    let builder = {
+        if config.runtime_path.is_some() {
+            return Err("runtime_path requires load-dynamic".into());
+        }
+        ort::init()
+    };
     // ort::Error::new itself calls the runtime API, so loader failures above
     // must remain plain strings until the library has initialized successfully.
     (|| -> Result<OrtexEnvironment, Error> {
-        let mut builder = builder.with_name("Ortex");
+        let mut builder = builder
+            .with_name(config.name)
+            .with_execution_providers(map_eps(env, config.providers, true)?);
         let logs = level.map(LogBuffer::new);
         if let Some(logs) = &logs {
             builder = builder.with_logger(logs.logger());
@@ -108,7 +148,7 @@ pub fn environment(
 
 #[derive(NifMap)]
 pub struct SessionOptions {
-    providers: Vec<ProviderConfig>,
+    providers: Option<Vec<ProviderConfig>>,
     optimization_level: i32,
     error_on_failure: bool,
     intra_threads: Option<usize>,
@@ -139,10 +179,13 @@ fn session_builder(
     {
         return Err(Error::new("session thread counts/spinning require independent_thread_pool: true when using a global pool"));
     }
-    let providers = map_eps(env, opts.providers, opts.error_on_failure)?;
     let mut builder = Session::builder(&environment.environment)?
-        .with_optimization_level(map_opt_level(opts.optimization_level))?
-        .with_execution_providers(providers)?;
+        .with_optimization_level(map_opt_level(opts.optimization_level))?;
+    if let Some(providers) = opts.providers {
+        builder = builder
+            .with_no_environment_execution_providers()?
+            .with_execution_providers(map_eps(env, providers, opts.error_on_failure)?)?;
+    }
     if opts.independent_thread_pool {
         builder = builder.with_independent_thread_pool()?;
     }
