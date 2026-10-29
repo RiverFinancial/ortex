@@ -63,6 +63,14 @@ fn run(
     model::run(model, inputs).map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
+#[rustler::nif(schedule = "DirtyIo")]
+fn run_named(
+    model: ResourceArc<model::OrtexModel>,
+    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+) -> NifResult<model::NamedOutputs> {
+    model::run_named(model, inputs).map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
+}
+
 #[rustler::nif(schedule = "DirtyCpu")]
 fn from_binary(bin: Binary, shape: Term, dtype: Term) -> NifResult<ResourceArc<OrtexTensor>> {
     let shape: Vec<usize> = rustler::types::tuple::get_tuple(shape)?

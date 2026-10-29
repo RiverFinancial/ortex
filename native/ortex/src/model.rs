@@ -10,6 +10,7 @@ use std::sync::Mutex;
 
 pub type Description = Vec<(String, String, Option<Vec<i64>>)>;
 pub type Outputs = Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>;
+pub type NamedOutputs = Vec<(String, (ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize))>;
 
 pub struct OrtexEnvironment {
     environment: Environment,
@@ -203,6 +204,26 @@ pub fn run(
     model: ResourceArc<OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
 ) -> Result<Outputs, Error> {
+    if inputs.len() != model.inputs.len() {
+        return Err(Error::new(format!(
+            "Expected {} inputs, got {}",
+            model.inputs.len(),
+            inputs.len()
+        )));
+    }
+    let inputs = model
+        .inputs
+        .iter()
+        .zip(inputs)
+        .map(|(descriptor, input)| (descriptor.0.clone(), input))
+        .collect();
+    run_named(model, inputs).map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
+}
+
+pub fn run_named(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+) -> Result<NamedOutputs, Error> {
     let mut session = model
         .session
         .lock()
@@ -214,21 +235,31 @@ pub fn run(
             inputs.len()
         )));
     }
-    let mut values: Vec<SessionInputValue<'_>> = Vec::with_capacity(inputs.len());
-    for (input, descriptor) in inputs.iter().zip(session.inputs()) {
-        let input: &OrtexTensor = input;
-        if is_bool_input(descriptor.dtype()) {
-            values.push((&input.clone().to_bool()?).try_into()?);
-        } else {
-            values.push(input.try_into()?);
+    let mut seen = std::collections::HashSet::new();
+    let mut values: Vec<(String, SessionInputValue<'_>)> = Vec::with_capacity(inputs.len());
+    for (name, input) in &inputs {
+        if !seen.insert(name) {
+            return Err(Error::new(format!("Duplicate input {name:?}")));
         }
+        let descriptor = session
+            .inputs()
+            .iter()
+            .find(|d| d.name() == name)
+            .ok_or_else(|| Error::new(format!("Unknown input {name:?}")))?;
+        let input: &OrtexTensor = input;
+        let value = if is_bool_input(descriptor.dtype()) {
+            (&input.clone().to_bool()?).try_into()?
+        } else {
+            input.try_into()?
+        };
+        values.push((name.clone(), value));
     }
     let names: Vec<String> = session
         .outputs()
         .iter()
         .map(|o| o.name().to_owned())
         .collect();
-    let outputs = session.run(&values[..])?;
+    let outputs = session.run(values)?;
     names
         .iter()
         .map(|name| {
@@ -238,7 +269,7 @@ pub fn run(
             let tensor: OrtexTensor = value.try_into()?;
             let shape = tensor.shape();
             let (dtype, bits) = tensor.dtype();
-            Ok((ResourceArc::new(tensor), shape, dtype, bits))
+            Ok((name.clone(), (ResourceArc::new(tensor), shape, dtype, bits)))
         })
         .collect()
 }
