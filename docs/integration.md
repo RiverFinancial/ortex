@@ -20,6 +20,7 @@ writes to another repository. The broad original PR is superseded by the stack.
 | 10 | Tensor validation before runtime startup |
 | 11 | Combined constructor/pool/restart validation |
 | 12 | Structured types, dimensions, and model metadata |
+| 13 | Named tensor inputs and outputs |
 
 Each PR targets the preceding branch. Merge or retarget in order; the integration
 branch is for validation rather than a replacement broad PR. CI on each branch
@@ -39,12 +40,14 @@ ORTEX_BUILD=true ORT_DYLIB_PATH=/does-not-exist/libonnxruntime.so MIX_ENV=test \
   mix run --no-start scripts/check_binary_without_runtime.exs
 ```
 
-The assembled stack currently has 140 checks, with two optional ResNet checks
+The assembled stack currently has 146 checks, with two optional ResNet checks
 excluded when that external checkpoint is absent. Its fixture contains only
 synthetic data. Memory loading checks file/bytes score and descriptor parity,
 source-owner process exit, malformed-model recovery, and concurrent loading.
 Metadata fixtures cover named/unnamed dimensions, scalar booleans, strings,
 sequence/map descriptors, Unicode custom properties, and concurrent reads/runs.
+Named-I/O tests check order-independent binding, Unicode output names, constructor
+parity, invalid and duplicate names, and concurrent runs on a shared model.
 
 The separate global-pool VM exercises **both** file and memory constructors:
 inherited pools, rejected ignored settings, explicit independent pools, unchanged
@@ -61,7 +64,7 @@ alone does not prove those platform or constructor combinations passed.
 The initial runtime/build foundation is not the whole capability backlog. Continue
 with separate focused PRs for:
 
-- Named inputs/outputs, run options, output selection, run tags, and cancellation.
+- Run options, output selection, run tags, and cancellation.
 - Map/Sequence values, string tensors, scalar extraction, and borrowed tensor inputs.
 - EP-specific configuration and availability checks; further environment controls.
 - Elixir telemetry, runtime logging bridge, and run-level profiling.

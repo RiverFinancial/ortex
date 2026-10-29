@@ -79,6 +79,12 @@ defmodule Ortex do
 
   If there is only one input you can optionally pass a bare tensor rather than a tuple.
 
+  A map of binary input names to tensors returns a map of binary output names
+  to tensors. Input names must match the graph exactly; map iteration order
+  does not affect binding. Positional calls continue to return tuples.
+
+      outputs = Ortex.run(model, %{"features" => features})
+
   ## Examples
 
       iex> model = Ortex.load("./models/tinymodel.onnx")

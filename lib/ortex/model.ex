@@ -62,6 +62,20 @@ defmodule Ortex.Model do
   end
 
   @doc false
+  def run(%__MODULE__{reference: reference}, inputs)
+      when is_map(inputs) and not is_struct(inputs) do
+    inputs =
+      Enum.map(inputs, fn
+        {name, %Nx.Tensor{} = tensor} when is_binary(name) -> {name, input_reference(tensor)}
+        _ -> raise ArgumentError, "named inputs must map binary names to Nx tensors"
+      end)
+
+    case Ortex.Native.run_named(reference, inputs) do
+      {:error, message} -> raise message
+      outputs -> Map.new(outputs, fn {name, tensor} -> {name, output_tensor(tensor)} end)
+    end
+  end
+
   def run(%Ortex.Model{} = model, tensor) when not is_tuple(tensor) do
     run(model, {tensor})
   end
@@ -74,8 +88,7 @@ defmodule Ortex.Model do
              model,
              tensors
              |> Tuple.to_list()
-             |> Enum.map(fn x -> x |> Nx.backend_transfer(Ortex.Backend) end)
-             |> Enum.map(fn %Nx.Tensor{data: %Ortex.Backend{ref: x}} -> x end)
+             |> Enum.map(&input_reference/1)
            ) do
         {:error, msg} -> raise msg
         output -> output
@@ -83,15 +96,22 @@ defmodule Ortex.Model do
 
     # Pack the output into new Ortex.Backend tensor(s)
     output
-    |> Enum.map(fn {ref, shape, dtype_atom, dtype_bits} ->
-      %Nx.Tensor{
-        data: %Ortex.Backend{ref: ref},
-        shape: shape |> List.to_tuple(),
-        type: {dtype_atom, dtype_bits},
-        names: List.duplicate(nil, length(shape))
-      }
-    end)
+    |> Enum.map(&output_tensor/1)
     |> List.to_tuple()
+  end
+
+  defp input_reference(%Nx.Tensor{} = tensor) do
+    %Nx.Tensor{data: %Ortex.Backend{ref: reference}} = Nx.backend_transfer(tensor, Ortex.Backend)
+    reference
+  end
+
+  defp output_tensor({ref, shape, dtype_atom, dtype_bits}) do
+    %Nx.Tensor{
+      data: %Ortex.Backend{ref: ref},
+      shape: shape |> List.to_tuple(),
+      type: {dtype_atom, dtype_bits},
+      names: List.duplicate(nil, length(shape))
+    }
   end
 end
 
