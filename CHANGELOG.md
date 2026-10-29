@@ -20,6 +20,7 @@
 - Configure environment name, runtime path, and inherited default providers with explicit session overrides.
 - Retain numeric storage/Serving support and reject unsupported batching value types early.
 - Summarize ONNX protobuf graphs without a runtime, including versions, operators, initializer estimates, and ZipMap.
+- Cancel one model-bound inference attempt with immutable `Ortex.RunControl` options.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 

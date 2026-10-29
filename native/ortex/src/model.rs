@@ -1,12 +1,12 @@
 //! Session resources own their environment and serialize runs through a mutex.
 use crate::providers::{map_eps, ProviderConfig};
+use crate::run_control::{PreparedRun, RunControl};
 use crate::runtime_logs::LogBuffer;
 use crate::tensor::OrtexTensor;
 use crate::utils::map_opt_level;
 use crate::values::InputValue;
 use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
-use ort::session::{OutputSelector, RunOptions};
 use ort::value::{DynValue, ValueType};
 use ort::Error;
 use rustler::{Atom, Env, NifMap, Resource, ResourceArc};
@@ -18,8 +18,8 @@ pub type NamedOutputs = Vec<(String, (ResourceArc<OrtexTensor>, Vec<usize>, Atom
 
 #[derive(NifMap, Default)]
 pub struct InferenceOptions {
-    outputs: Option<Vec<String>>,
-    tag: Option<String>,
+    pub(crate) outputs: Option<Vec<String>>,
+    pub(crate) tag: Option<String>,
 }
 
 pub struct OrtexEnvironment {
@@ -337,6 +337,41 @@ pub fn infer<T>(
     model: ResourceArc<OrtexModel>,
     inputs: Vec<(String, InputValue)>,
     options: InferenceOptions,
+    decode: impl FnMut(&DynValue) -> Result<T, Error>,
+) -> Result<Vec<(String, T)>, Error> {
+    let prepared = PreparedRun::new(&model, options)?;
+    infer_prepared(model, inputs, &prepared, decode)
+}
+
+pub fn infer_controlled<T>(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<(String, InputValue)>,
+    control: &RunControl,
+    decode: impl FnMut(&DynValue) -> Result<T, Error>,
+) -> Result<Vec<(String, T)>, Error> {
+    control.claim(&model)?;
+    infer_prepared(model, inputs, control.prepared(), decode)
+}
+
+pub fn infer_controlled_positional<T>(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<InputValue>,
+    control: &RunControl,
+    decode: impl FnMut(&DynValue) -> Result<T, Error>,
+) -> Result<Vec<(String, T)>, Error> {
+    control.claim(&model)?;
+    let inputs = positional_inputs(&model, inputs)?;
+    infer_prepared(model, inputs, control.prepared(), decode)
+}
+
+pub(crate) fn output_names(model: &OrtexModel) -> Vec<String> {
+    model.outputs.iter().map(|d| d.0.clone()).collect()
+}
+
+fn infer_prepared<T>(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<(String, InputValue)>,
+    prepared: &PreparedRun,
     mut decode: impl FnMut(&DynValue) -> Result<T, Error>,
 ) -> Result<Vec<(String, T)>, Error> {
     let mut session = model
@@ -364,38 +399,9 @@ pub fn infer<T>(
         let value = input.prepare(descriptor.dtype())?;
         values.push((name.clone(), value));
     }
-    let names: Vec<String> = options.outputs.unwrap_or_else(|| {
-        session
-            .outputs()
-            .iter()
-            .map(|o| o.name().to_owned())
-            .collect()
-    });
-    if names.is_empty() {
-        return Err(Error::new("outputs must be non-empty"));
-    }
-    let mut seen = std::collections::HashSet::new();
-    for name in &names {
-        if !seen.insert(name) {
-            return Err(Error::new(format!("Duplicate output {name:?}")));
-        }
-        if !session.outputs().iter().any(|d| d.name() == name) {
-            return Err(Error::new(format!("Unknown output {name:?}")));
-        }
-    }
-    let mut run_options = RunOptions::new()?;
-    if let Some(tag) = options.tag {
-        run_options = run_options.with_tag(tag)?;
-    }
-    let run_options = run_options.with_outputs(
-        names
-            .iter()
-            .fold(OutputSelector::no_default(), |selector, name| {
-                selector.with(name)
-            }),
-    );
-    let outputs = session.run_with_options(values, &run_options)?;
-    names
+    let outputs = session.run_with_options(values, prepared.options())?;
+    prepared
+        .names()
         .iter()
         .map(|name| {
             let value = outputs

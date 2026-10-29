@@ -175,6 +175,10 @@ defmodule Ortex do
   `:tag` is a binary identifying the run in runtime logs. Options apply to this
   call only and do not mutate the session's defaults.
 
+  `:control` accepts an `Ortex.RunControl` prepared for this model, allowing a
+  different process to cancel the inference attempt. Its immutable output/tag
+  options replace per-call `:outputs`/`:tag`, which cannot be passed alongside it.
+
       Ortex.run(model, %{"features" => features}, outputs: ["scores"], tag: "risk-score")
   """
   defdelegate run(model, tensors, opts), to: Ortex.Model
