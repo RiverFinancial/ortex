@@ -220,11 +220,9 @@ fn get_bytes<'a, T>(array: &'a ArrayBase<T, IxDyn>) -> &'a [u8]
 where
     T: Data,
 {
-    let len = array.len();
-    let binding = unsafe { std::mem::zeroed() };
-    let f = array.get(0).unwrap_or(&binding);
-    let size: usize = std::mem::size_of_val(f);
-    unsafe { std::slice::from_raw_parts(array.as_ptr() as *const u8, len * size) }
+    // Every caller owns a contiguous array of primitive numeric values.
+    let len = array.len() * std::mem::size_of::<T::Elem>();
+    unsafe { std::slice::from_raw_parts(array.as_ptr() as *const u8, len) }
 }
 
 impl TryFrom<&Value> for OrtexTensor {
