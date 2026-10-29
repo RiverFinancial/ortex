@@ -1,5 +1,6 @@
 //! Session resources own their environment and serialize runs through a mutex.
 use crate::providers::{map_eps, ProviderConfig};
+use crate::runtime_logs::LogBuffer;
 use crate::tensor::OrtexTensor;
 use crate::utils::map_opt_level;
 use crate::values::InputValue;
@@ -24,11 +25,12 @@ pub struct InferenceOptions {
 pub struct OrtexEnvironment {
     environment: Environment,
     global_pool: bool,
+    pub(crate) logs: Option<std::sync::Arc<LogBuffer>>,
 }
 // Resource encoding only copies the resource handle; it cannot mutate ort's
 // environment or its internal callback state across an unwind.
 impl std::panic::RefUnwindSafe for OrtexEnvironment {}
-#[rustler::resource_impl(name = "OrtexEnvironmentV1")]
+#[rustler::resource_impl(name = "OrtexEnvironmentV2")]
 impl Resource for OrtexEnvironment {}
 
 pub struct OrtexModel {
@@ -47,7 +49,11 @@ pub struct PoolOptions {
     spinning: Option<bool>,
 }
 
-pub fn environment(options: Option<PoolOptions>) -> Result<OrtexEnvironment, String> {
+pub fn environment(
+    options: Option<PoolOptions>,
+    log_level: Option<i32>,
+) -> Result<OrtexEnvironment, String> {
+    let level = log_level.map(crate::runtime_logs::level).transpose()?;
     let global_pool = options.is_some();
     #[cfg(feature = "load-dynamic")]
     let builder = {
@@ -70,6 +76,10 @@ pub fn environment(options: Option<PoolOptions>) -> Result<OrtexEnvironment, Str
     // must remain plain strings until the library has initialized successfully.
     (|| -> Result<OrtexEnvironment, Error> {
         let mut builder = builder.with_name("Ortex");
+        let logs = level.map(LogBuffer::new);
+        if let Some(logs) = &logs {
+            builder = builder.with_logger(logs.logger());
+        }
         if let Some(options) = options {
             let mut pool = GlobalThreadPoolOptions::default();
             if let Some(n) = options.intra_threads {
@@ -83,9 +93,14 @@ pub fn environment(options: Option<PoolOptions>) -> Result<OrtexEnvironment, Str
             }
             builder = builder.with_global_thread_pool(pool);
         }
+        let environment = builder.build()?;
+        if let Some(level) = level {
+            environment.set_log_level(level);
+        }
         Ok(OrtexEnvironment {
-            environment: builder.build()?,
+            environment,
             global_pool,
+            logs,
         })
     })()
     .map_err(|e| e.to_string())

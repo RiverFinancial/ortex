@@ -42,6 +42,8 @@ defmodule Ortex.Native do
   def metadata(_model), do: :erlang.nif_error(:nif_not_loaded)
   def end_profiling(_model), do: :erlang.nif_error(:nif_not_loaded)
   def execution_providers(_environment), do: :erlang.nif_error(:nif_not_loaded)
+  def environment_with_logs(_options, _level), do: :erlang.nif_error(:nif_not_loaded)
+  def take_runtime_logs(_environment), do: :erlang.nif_error(:nif_not_loaded)
   def show_session(_model), do: :erlang.nif_error(:nif_not_loaded)
 
   def slice(_tensor, _start_indicies, _lengths, _strides),

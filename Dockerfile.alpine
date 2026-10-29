@@ -12,5 +12,7 @@ ENV MIX_ENV=test ORTEX_BUILD=true ORT_DYLIB_PATH=/usr/lib/libonnxruntime.so.1.24
 COPY mix.exs mix.lock ./
 RUN mix local.hex --force && mix local.rebar --force && mix deps.get
 COPY . .
-RUN mix test && mix run --no-start scripts/check_global_pool.exs
+RUN mix test && mix run --no-start scripts/check_global_pool.exs && \
+    mix run --no-start scripts/check_runtime_logs.exs info && \
+    mix run --no-start scripts/check_runtime_logs.exs warning
 CMD ["mix", "run", "bench/inference.exs", "2000", "8"]
