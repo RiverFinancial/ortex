@@ -22,7 +22,7 @@ jobs:
       matrix:
         include:
           - {target: aarch64-apple-darwin, os: macos-15, runtime: '1.24.4'}
-          - {target: x86_64-apple-darwin, os: macos-15-intel, runtime: '1.22.0'}
+          - {target: x86_64-apple-darwin, os: macos-15-intel, runtime: '1.23.2'}
           - {target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, runtime: '1.24.4'}
           - {target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, runtime: '1.24.4'}
           - {target: x86_64-unknown-linux-musl, os: ubuntu-22.04}
