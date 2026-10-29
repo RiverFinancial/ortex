@@ -46,3 +46,18 @@ These single-run observations show no throughput regression on this fixture from
 serializing a shared session. They do not isolate the cause of the improvement:
 Rustler, ort, and binary conversion code all changed. Task scheduling dominates
 some of the concurrent measurements. No production performance claim follows.
+
+With the same disabled graph optimization and explicit single-threaded,
+non-spinning pools: 133,923 serial calls/s, 75,563 concurrent calls/s, p50 5 us,
+p99 18 us. RSS samples stabilized at 107,986,944 bytes after warmup.
+
+A separate default-options run with 20,000 timed calls and five further
+20,000-call batches reported RSS samples of 116,228,096; 116,752,384; 114,655,232;
+114,851,840; and 115,146,752 bytes. This is bounded variation over a short run,
+not a long-duration soak or a reproduction of upstream issue 44.
+
+All 126 checks and the global-pool/application-restart check also pass with the
+official ONNX Runtime 1.17.3 arm64 macOS library. That test exposed an important
+compatibility detail: opt=3 must map to `GraphOptimizationLevel::All` (99).
+Current ort's `Level3` maps to the newer layout-only value (3), which runtime
+1.17 rejects. The wrapper preserves legacy all-optimizations behavior.

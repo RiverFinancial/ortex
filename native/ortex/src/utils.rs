@@ -122,7 +122,9 @@ pub fn map_opt_level(opt: i32) -> GraphOptimizationLevel {
     match opt {
         1 => GraphOptimizationLevel::Level1,
         2 => GraphOptimizationLevel::Level2,
-        3 => GraphOptimizationLevel::Level3,
+        // Older runtimes accept ORT_ENABLE_ALL (99), whereas ort's current
+        // Level3 means the newer ORT_ENABLE_LAYOUT (3). Preserve legacy opt=3.
+        3 => GraphOptimizationLevel::All,
         _ => GraphOptimizationLevel::Disable,
     }
 }

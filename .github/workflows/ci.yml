@@ -31,7 +31,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Rust
-        run: rustup toolchain install 1.93.1 --profile minimal --component rustfmt
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal --component rustfmt
+          rustup default 1.93.1
       - name: Install test runtime
         run: python scripts/install_runtime.py '${{ matrix.runtime }}'
       - run: mix deps.get --check-locked
