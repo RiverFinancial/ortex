@@ -41,13 +41,18 @@ defmodule Ortex.Model do
   @doc false
   def load_from_memory(bytes, opts \\ []) when is_binary(bytes) do
     {environment, options} = Ortex.Options.validate!(opts)
-    environment = environment || Ortex.Environment.get()
-    Ortex.Native.init_from_memory(bytes, environment.reference, options) |> to_model()
+
+    Ortex.Telemetry.load(%{source: :memory, byte_size: byte_size(bytes)}, options, fn ->
+      environment = environment || Ortex.Environment.get()
+      Ortex.Native.init_from_memory(bytes, environment.reference, options) |> to_model()
+    end)
   end
 
   defp load_with_options(path, environment, options) when is_binary(path) do
-    environment = environment || Ortex.Environment.get()
-    Ortex.Native.init_with_options(path, environment.reference, options) |> to_model()
+    Ortex.Telemetry.load(%{source: :file, path: path}, options, fn ->
+      environment = environment || Ortex.Environment.get()
+      Ortex.Native.init_with_options(path, environment.reference, options) |> to_model()
+    end)
   end
 
   defp to_model({:error, message}), do: raise(message)
@@ -65,7 +70,10 @@ defmodule Ortex.Model do
   def run(model, inputs), do: run(model, inputs, [])
 
   @doc false
-  def run(model, inputs, opts), do: run_validated(model, inputs, Ortex.RunOptions.validate!(opts))
+  def run(%__MODULE__{} = model, inputs, opts) do
+    opts = Ortex.RunOptions.validate!(opts)
+    Ortex.Telemetry.run(model, inputs, opts, fn -> run_validated(model, inputs, opts) end)
+  end
 
   defp run_validated(%__MODULE__{reference: reference}, inputs, opts)
        when is_map(inputs) and not is_struct(inputs) do

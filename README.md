@@ -33,6 +33,9 @@ Inspecting a model shows the expected inputs, outputs, data types, and shapes. A
 
 To see more real world examples see the `examples` folder.
 
+Public loading and inference calls emit `:telemetry` spans. See `Ortex.Telemetry`
+for event names, measurements, and shape/type metadata.
+
 ### Serving
 
 `Ortex` also implements `Nx.Serving` behaviour. To use it in your application's
