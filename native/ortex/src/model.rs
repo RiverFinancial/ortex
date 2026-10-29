@@ -4,7 +4,7 @@ use crate::utils::{is_bool_input, map_eps, map_opt_level};
 use ort::environment::{Environment, GlobalThreadPoolOptions};
 use ort::session::{builder::SessionBuilder, Session, SessionInputValue};
 use ort::session::{OutputSelector, RunOptions};
-use ort::value::ValueType;
+use ort::value::{DynValue, ValueType};
 use ort::Error;
 use rustler::{Atom, Env, NifMap, Resource, ResourceArc};
 use std::sync::Mutex;
@@ -219,6 +219,15 @@ pub fn run_with_options(
     inputs: Vec<ResourceArc<OrtexTensor>>,
     options: InferenceOptions,
 ) -> Result<Outputs, Error> {
+    let inputs = positional_inputs(&model, inputs)?;
+    run_named_with_options(model, inputs, options)
+        .map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
+}
+
+pub fn positional_inputs(
+    model: &OrtexModel,
+    inputs: Vec<ResourceArc<OrtexTensor>>,
+) -> Result<Vec<(String, ResourceArc<OrtexTensor>)>, Error> {
     if inputs.len() != model.inputs.len() {
         return Err(Error::new(format!(
             "Expected {} inputs, got {}",
@@ -226,14 +235,12 @@ pub fn run_with_options(
             inputs.len()
         )));
     }
-    let inputs = model
+    Ok(model
         .inputs
         .iter()
         .zip(inputs)
         .map(|(descriptor, input)| (descriptor.0.clone(), input))
-        .collect();
-    run_named_with_options(model, inputs, options)
-        .map(|outputs| outputs.into_iter().map(|(_, tensor)| tensor).collect())
+        .collect())
 }
 
 pub fn run_named(
@@ -248,6 +255,20 @@ pub fn run_named_with_options(
     inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
     options: InferenceOptions,
 ) -> Result<NamedOutputs, Error> {
+    infer(model, inputs, options, |value| {
+        let tensor: OrtexTensor = value.try_into()?;
+        let shape = tensor.shape();
+        let (dtype, bits) = tensor.dtype();
+        Ok((ResourceArc::new(tensor), shape, dtype, bits))
+    })
+}
+
+pub fn infer<T>(
+    model: ResourceArc<OrtexModel>,
+    inputs: Vec<(String, ResourceArc<OrtexTensor>)>,
+    options: InferenceOptions,
+    mut decode: impl FnMut(&DynValue) -> Result<T, Error>,
+) -> Result<Vec<(String, T)>, Error> {
     let mut session = model
         .session
         .lock()
@@ -315,10 +336,7 @@ pub fn run_named_with_options(
             let value = outputs
                 .get(name)
                 .ok_or_else(|| Error::new(format!("Missing output {name}")))?;
-            let tensor: OrtexTensor = value.try_into()?;
-            let shape = tensor.shape();
-            let (dtype, bits) = tensor.dtype();
-            Ok((name.clone(), (ResourceArc::new(tensor), shape, dtype, bits)))
+            Ok((name.clone(), decode(value)?))
         })
         .collect()
 }

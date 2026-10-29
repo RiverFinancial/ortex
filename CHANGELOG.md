@@ -9,6 +9,7 @@
 - Inspect structured I/O types, symbolic dimensions, model fields, and custom properties.
 - Bind tensor inputs by binary name and return named tensor outputs with map-based runs.
 - Select and order runtime outputs and assign a per-run log tag with `run/3`.
+- Decode ZipMap classifier probabilities to maps and tensor sequences to lists.
 - Support checksum-verified precompiled CPU NIFs and source-build overrides.
 - Default to dynamic runtime loading and API 17, without runtime build headers.
 
