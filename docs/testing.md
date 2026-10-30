@@ -28,7 +28,7 @@ from the original estimators; MNIST uses Python ORT as a binding reference, with
 synthetic pixels. None of these checks claim to validate ORT's operators or model
 accuracy. Iris uses tensor probabilities on main; ZipMap needs the separate
 container-output feature. Install fixtures/requirements.txt in a separate Python
-3.12 environment before `make fixtures`. Generation validates exports with ONNX
+3.12 environment before `make fixtures PYTHON=/path/to/exporter/bin/python`. Generation validates exports with ONNX
 and Python ORT; ordinary tests need neither Python exporters nor network access.
 
 `make test.tooling` checks the harnesses themselves, including partial staging,
