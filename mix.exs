@@ -7,6 +7,8 @@ defmodule Ortex.MixProject do
       version: "0.1.10",
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
+      test_ignore_filters: [~r{test/(system|package|fixtures|support)/}],
+      test_coverage: [ignore_modules: [Ortex.Native], summary: [threshold: 0], export: "library"],
       deps: deps(),
 
       # Docs

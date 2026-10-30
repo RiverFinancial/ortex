@@ -1,6 +1,10 @@
 # Examples
 
-Examples have an independent Mix project: from this directory, run `mix deps.get`
+Small XGBoost, Iris, and MNIST examples run from the repository root via
+`MIX_ENV=test mix run examples/run.exs NAME`, with ORT_DYLIB_PATH set. Their
+prepared artifacts also power `make test.models`.
+
+The tokenizer examples have an independent Mix project: from this directory, run `mix deps.get`
 and `mix run distilbert/distilbert_classification.exs` (or another example).
 Set ORT_DYLIB_PATH to the separately installed runtime. Model paths are relative
 to this directory. The Python export dependencies are separate from the library.

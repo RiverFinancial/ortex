@@ -1,0 +1,45 @@
+{
+  "iris": {
+    "atol": 1e-05,
+    "cases_sha256": "f87eb73635c7a3a75898d3e8fd78693f42f38c026e0bad65422ae37745bce618",
+    "generator": "fixtures/generate.py",
+    "ir": 8,
+    "license": "CC-BY-4.0 (Iris dataset; see NOTICE.md)",
+    "opsets": {
+      "": 15,
+      "ai.onnx.ml": 1
+    },
+    "reference": "scikit-learn predict and predict_proba",
+    "requirements": "fixtures/requirements.txt",
+    "sha256": "6128c916198679d0ac1ad16dcb72325c2586893bbf7309baec7c0c8ce04db4fb",
+    "source": "scikit-learn load_iris; StandardScaler + LogisticRegression"
+  },
+  "mnist": {
+    "atol": 1e-05,
+    "cases_sha256": "a3f8ef2472a13494a7cf022ff44cd3f1399d6607eccefffaff6efdda33bf70ba",
+    "generator": "fixtures/generate.py",
+    "ir": 7,
+    "license": "Apache-2.0 (model repository); upstream model documentation also records MIT",
+    "opsets": {
+      "": 12
+    },
+    "reference": "Python ONNX Runtime 1.24.4; synthetic pixels, seed 42",
+    "requirements": "fixtures/requirements.txt",
+    "sha256": "5c688690f8bacf667d4c2074af5ad0646ca328d7ab03eccf944a65b320171bdd",
+    "source": "https://huggingface.co/onnxmodelzoo/mnist-12/resolve/1cd752f4a3d818fa215aa621c78b8a10a4a1a3a5/mnist-12.onnx"
+  },
+  "xgboost": {
+    "atol": 1e-05,
+    "cases_sha256": "f16d557b5816d9fdb253a0a0db7e7a9d4d6abf67ceb247dbe584a60f57e44f4a",
+    "generator": "fixtures/generate.py",
+    "ir": 8,
+    "license": "MIT",
+    "opsets": {
+      "ai.onnx.ml": 1
+    },
+    "reference": "XGBoost predict, independently checked against Python ORT",
+    "requirements": "fixtures/requirements.txt",
+    "sha256": "ab9d76d2fbc49faf4396cf1187978c33597ce680c077911e6cd0347c0d1a5ebf",
+    "source": "deterministic synthetic training data; seed 42"
+  }
+}

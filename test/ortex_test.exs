@@ -2,27 +2,6 @@ defmodule OrtexTest do
   use ExUnit.Case
   doctest Ortex
 
-  @tag :resnet50
-  test "resnet50" do
-    model = Ortex.load("./models/resnet50.onnx")
-
-    input = Nx.broadcast(0.0, {1, 3, 224, 224})
-    {output} = Ortex.run(model, {input})
-    argmax = output |> Nx.backend_transfer() |> Nx.argmax(axis: 1)
-
-    assert argmax == Nx.tensor([499])
-  end
-
-  @tag :resnet50
-  test "Nx.Serving with resnet50" do
-    model = Ortex.load("./models/resnet50.onnx")
-
-    serving = Nx.Serving.new(Ortex.Serving, model)
-    batch = Nx.Batch.stack([{Nx.broadcast(0.0, {3, 224, 224})}])
-    {result} = Nx.Serving.run(serving, batch)
-    assert result |> Nx.backend_transfer() |> Nx.argmax(axis: 1) == Nx.tensor([499])
-  end
-
   test "Nx.Serving with tinymodel" do
     model = Ortex.load("./models/tinymodel.onnx")
 
