@@ -19,7 +19,7 @@ def main():
     )
     if not hook.is_absolute():
         hook = root / hook
-    content = '#!/bin/sh\nexec sh "$(git rev-parse --show-toplevel)/scripts/precommit" "$@"\n'
+    content = '#!/bin/sh\nroot=$(git rev-parse --show-toplevel) || exit 1\ntest -f "$root/scripts/precommit" || exit 0\nexec sh "$root/scripts/precommit" "$@"\n'
     if hook.exists() and hook.read_text() != content and not args.force:
         raise SystemExit(
             f"Existing hook left intact: {shlex.quote(str(hook))}; inspect it before using --force"

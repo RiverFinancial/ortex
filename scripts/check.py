@@ -49,12 +49,12 @@ def checks(files, directory, full):
     jobs = []
     if groups[".py"]:
         jobs += [
-            ("python lint", ["ruff", "check", *groups[".py"]]),
-            ("python format", ["ruff", "format", "--check", *groups[".py"]]),
+            ("python lint", ["ruff", "check", "--", *groups[".py"]]),
+            ("python format", ["ruff", "format", "--check", "--", *groups[".py"]]),
         ]
     elixir = groups[".ex"] + groups[".exs"]
     if elixir:
-        jobs.append(("elixir format", ["mix", "format", "--check-formatted", *elixir]))
+        jobs.append(("elixir format", ["mix", "format", "--check-formatted", "--", *elixir]))
     if groups[".rs"] or "native/ortex/Cargo.toml" in files or "rust-toolchain.toml" in files:
         jobs.append(
             (
@@ -64,7 +64,10 @@ def checks(files, directory, full):
         )
     shell = [p for p in files if p.endswith(".sh") or p == "scripts/precommit"]
     if shell:
-        jobs += [("shell lint", ["shellcheck", *shell]), ("shell format", ["shfmt", "-d", *shell])]
+        jobs += [
+            ("shell lint", ["shellcheck", "--", *shell]),
+            ("shell format", ["shfmt", "-d", "--", *shell]),
+        ]
     if any(p.startswith(".github/workflows/") for p in files):
         workflows = sorted(
             str(p.relative_to(directory)) for p in (directory / ".github/workflows").glob("*.yml")
