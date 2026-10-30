@@ -24,3 +24,15 @@ ortex-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+/runtime/
+/.venv/
+/dist/
+/bench/results/
+**/__pycache__/
+/.ruff_cache/
+/.cache/
+/priv/native/
+/examples/_build/
+/examples/deps/
+/examples/priv/
