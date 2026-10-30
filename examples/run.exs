@@ -1,0 +1,6 @@
+name = List.first(System.argv(), "xgboost")
+unless name in ~w(xgboost iris mnist), do: raise("choose xgboost, iris, or mnist")
+root = Path.expand("../test/fixtures", __DIR__)
+cases = File.read!(Path.join(root, name <> ".json")) |> :json.decode()
+model = Ortex.load(Path.join(root, name <> ".onnx"), [:cpu], 0)
+IO.inspect(Ortex.run(model, Nx.tensor(cases["inputs"], type: :f32)), label: name)
