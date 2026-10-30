@@ -1,0 +1,26 @@
+{
+  "1.19.2/linux-x64": {
+    "sha256": "eb00c64e0041f719913c4080e0fed7d9963dc3aa9b54664df6036d8308dbcd33",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.19.2/onnxruntime-linux-x64-1.19.2.tgz"
+  },
+  "1.23.2/osx-x86_64": {
+    "sha256": "d10359e16347b57d9959f7e80a225a5b4a66ed7d7e007274a15cae86836485a6",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/onnxruntime-osx-x86_64-1.23.2.tgz"
+  },
+  "1.24.4/linux-aarch64": {
+    "sha256": "866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-aarch64-1.24.4.tgz"
+  },
+  "1.24.4/linux-x64": {
+    "sha256": "3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz"
+  },
+  "1.24.4/osx-arm64": {
+    "sha256": "93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-osx-arm64-1.24.4.tgz"
+  },
+  "1.24.4/win-x64": {
+    "sha256": "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357",
+    "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip"
+  }
+}

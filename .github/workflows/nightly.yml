@@ -1,0 +1,35 @@
+name: Nightly compatibility
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: nightly-main
+  cancel-in-progress: false
+jobs:
+  changed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.changed.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14.10'
+      - id: changed
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "run=$(python scripts/ci.py changed "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+  full:
+    needs: changed
+    if: needs.changed.outputs.run == 'true' || github.event_name == 'workflow_dispatch'
+    # actionlint 1.7.12 does not yet parse GitHub's $/ reusable-workflow syntax.
+    uses: ./.github/workflows/checks.yml # zizmor: ignore[self-repository]
+    with:
+      scope: full

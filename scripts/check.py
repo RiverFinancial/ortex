@@ -3,6 +3,7 @@
 import argparse
 import concurrent.futures
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,7 @@ def git(*arguments):
 
 def run_check(item, directory):
     name, command = item
+    command = [shutil.which(command[0]) or command[0], *command[1:]]
     try:
         result = subprocess.run(
             command,

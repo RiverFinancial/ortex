@@ -1,8 +1,11 @@
 """Install the separately supplied ONNX Runtime; print its path for Make."""
 
 import argparse
+import hashlib
 import json
+import os
 import platform
+import re
 import tarfile
 import urllib.request
 import zipfile
@@ -32,14 +35,18 @@ def main():
         "Windows": "win-arm64" if arm else "win-x64",
     }[system]
     version = args.version or ("1.23.2" if target == "osx-x86_64" else "1.24.4")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        parser.error("expected a stable runtime version")
     extension = "zip" if system == "Windows" else "tgz"
     name = f"onnxruntime-{target}-{version}"
     DESTINATION.mkdir(exist_ok=True)
     archive = DESTINATION / f"{name}.{extension}"
-    urllib.request.urlretrieve(
-        f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/{archive.name}",
-        archive,
-    )
+    records = json.loads((ROOT / "ci/runtimes.json").read_text())
+    record = records[f"{version}/{target}"]
+    urllib.request.urlretrieve(record["url"], archive)
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != record["sha256"]:
+        archive.unlink()
+        raise SystemExit("runtime archive digest mismatch")
     if extension == "zip":
         with zipfile.ZipFile(archive) as source:
             source.extractall(DESTINATION)
@@ -56,6 +63,9 @@ def main():
         json.dumps({"version": version, "target": target, "library": str(library)}) + "\n"
     )
     print(library)
+    if output := os.environ.get("GITHUB_ENV"):
+        with open(output, "a", encoding="utf-8") as destination:
+            destination.write(f"ORT_DYLIB_PATH={library}\n")
 
 
 if __name__ == "__main__":

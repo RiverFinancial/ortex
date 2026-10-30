@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustler = "0.29.0"
-ort = { version = "2.0.0-rc.8" }
+ort = { version = "2.0.0-rc.8", default-features = false, features = ["ndarray", "half"] }
 ndarray = "0.16.1"
 half = "2.2.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
@@ -20,6 +20,7 @@ num-traits = "0.2.15"
 rustls = "0.22.4"
 
 [features]
+default = ["ort/load-dynamic"]
 # ONNXRuntime Execution providers
 directml = ["ort/directml"]
 coreml = ["ort/coreml"]

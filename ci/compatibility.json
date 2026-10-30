@@ -1,0 +1,17 @@
+{
+  "tools": {"elixir": "1.20.4", "otp": "29.1.1", "rust": "1.93.1", "msrv": "1.92.0", "python": "3.14.10"},
+  "pr": [
+    {"id": "linux-current", "os": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu", "elixir": "1.20.4", "otp": "29.1.1", "runtime": "1.24.4", "nx": "locked"},
+    {"id": "linux-minimum", "os": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu", "elixir": "1.19.7", "otp": "28.5.0.8", "runtime": "1.19.2", "nx": "minimum"},
+    {"id": "mac-arm", "os": "macos-15", "target": "aarch64-apple-darwin", "elixir": "1.20.4", "otp": "29.1.1", "runtime": "1.24.4", "nx": "locked"}
+  ],
+  "platforms": [
+    {"id": "linux-arm", "os": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-gnu", "runtime": "1.24.4"},
+    {"id": "mac-intel", "os": "macos-15-intel", "target": "x86_64-apple-darwin", "runtime": "1.23.2"},
+    {"id": "windows", "os": "windows-2022", "target": "x86_64-pc-windows-msvc", "runtime": "1.24.4"}
+  ],
+  "alpine": [
+    {"os": "ubuntu-24.04", "target": "x86_64-unknown-linux-musl"},
+    {"os": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-musl"}
+  ]
+}

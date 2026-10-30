@@ -1,22 +1,26 @@
 .DEFAULT_GOAL := help
 PYTHON ?= python3
-export PATH := $(CURDIR)/.venv/bin:$(CURDIR)/.venv/Scripts:$(PATH)
+VENV_PYTHON = $(if $(filter Windows_NT,$(OS)),.venv/Scripts/python.exe,.venv/bin/python)
+export PATH := $(CURDIR)/.venv/bin:$(CURDIR)/.venv/Scripts:$(CURDIR)/.cache/audit/bin:$(PATH)
 export MIX_ENV := test
 export ORT_DYLIB_PATH ?= $(shell $(PYTHON) scripts/install_runtime.py path 2>/dev/null)
 
 .PHONY: help setup deps doctor test docs hooks fmt lint check
 .PHONY: test.system test.package test.models test.tooling coverage bench fixtures package
+.PHONY: test.alpine
+.PHONY: setup.audit audit setup.rust
 
 help: ## Show development commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 setup: ## Fetch Mix dependencies and the development runtime
+	$(MAKE) setup.rust
 	mix local.hex --force
 	mix local.rebar --force
 	$(MAKE) deps
 	$(PYTHON) scripts/install_runtime.py install
 	$(PYTHON) -m venv .venv
-	.venv/bin/python -m pip install -r scripts/requirements.txt
+	$(VENV_PYTHON) -m pip install -r scripts/requirements.txt
 
 deps: ## Fetch the locked test and documentation dependencies
 	mix deps.get --check-locked
@@ -71,3 +75,16 @@ fixtures: ## Regenerate model fixtures (requires the separate exporter environme
 
 package: ## Assemble the local Hex archive
 	$(PYTHON) scripts/package.py build
+
+test.alpine: ## Run the same suites in the pinned Alpine environment
+	docker build -f ci/containers/alpine.Dockerfile -t ortex-foundation-alpine .
+	docker run --rm ortex-foundation-alpine
+
+setup.audit: ## Install the pinned advisory checker into the local cache
+	cargo install cargo-audit --version 0.22.2 --locked --root .cache/audit
+
+setup.rust: ## Install the pinned Rust compiler, formatter, and Clippy
+	$(PYTHON) scripts/toolchain.py
+
+audit: ## Report Rust advisories and retired Hex dependencies
+	$(PYTHON) scripts/audit.py

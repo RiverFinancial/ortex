@@ -1,6 +1,7 @@
 """Assemble the Hex archive and test it in a clean consuming project."""
 
 import argparse
+import gzip
 import io
 import os
 import re
@@ -23,7 +24,11 @@ def version():
 def build():
     destination = ROOT / "dist" / f"ortex-{version()}.tar"
     destination.parent.mkdir(exist_ok=True)
-    subprocess.run(["mix", "hex.build", "--output", str(destination)], cwd=ROOT, check=True)
+    subprocess.run(
+        [shutil.which("mix") or "mix", "hex.build", "--output", str(destination)],
+        cwd=ROOT,
+        check=True,
+    )
     return destination
 
 
@@ -34,9 +39,30 @@ def unpack(archive, destination):
         contents.extractall(destination, filter="data")
 
 
+def nif_archive(target):
+    policy = __import__("json").loads((ROOT / "ci/compatibility.json").read_text())
+    targets = {row["target"] for key in ["pr", "platforms", "alpine"] for row in policy[key]}
+    if target not in targets:
+        raise ValueError("target is not in the artifact contract")
+    source = ROOT / "priv/native" / ("libortex.dll" if "windows" in target else "libortex.so")
+    destination = ROOT / "dist" / f"ortex-{version()}-{target}.tar.gz"
+    destination.parent.mkdir(exist_ok=True)
+    with (
+        destination.open("wb") as stream,
+        gzip.GzipFile(fileobj=stream, mode="wb", filename="", mtime=0) as compressed,
+        tarfile.open(fileobj=compressed, mode="w") as archive,
+    ):
+        entry = tarfile.TarInfo(source.name)
+        data = source.read_bytes()
+        entry.size, entry.mode = len(data), 0o644
+        archive.addfile(entry, io.BytesIO(data))
+    return destination
+
+
 def test_package(archive, mode, nif, timeout):
     with tempfile.TemporaryDirectory(prefix="ortex-package-") as temporary:
-        directory = Path(temporary)
+        # Expand Windows 8.3 names before Mix compares priv-directory symlink targets.
+        directory = Path(temporary).resolve()
         package = directory / "ortex"
         unpack(archive, package)
         project = directory / "consumer"
@@ -83,6 +109,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("build")
+    nif = commands.add_parser("nif")
+    nif.add_argument("--target", required=True)
     test = commands.add_parser("test")
     test.add_argument("--archive", type=Path)
     test.add_argument("--mode", choices=["source", "prebuilt"], default="source")
@@ -91,6 +119,9 @@ def main():
     args = parser.parse_args()
     if args.command == "build":
         print(build())
+        return 0
+    if args.command == "nif":
+        print(nif_archive(args.target))
         return 0
     if args.timeout <= 0:
         parser.error("timeout must be positive")
