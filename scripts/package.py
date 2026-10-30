@@ -61,7 +61,8 @@ def nif_archive(target):
 
 def test_package(archive, mode, nif, timeout):
     with tempfile.TemporaryDirectory(prefix="ortex-package-") as temporary:
-        directory = Path(temporary)
+        # Expand Windows 8.3 names before Mix compares priv-directory symlink targets.
+        directory = Path(temporary).resolve()
         package = directory / "ortex"
         unpack(archive, package)
         project = directory / "consumer"
