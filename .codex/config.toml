@@ -1,0 +1,2 @@
+# Project commands and conventions are in AGENTS.md.
+# Hooks call the shared checker once it is introduced; user permissions stay local.
