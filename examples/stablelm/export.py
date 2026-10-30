@@ -1,8 +1,8 @@
+import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
 )
-import torch
 
 tokenizer = AutoTokenizer.from_pretrained("stabilityai/stablelm-tuned-alpha-3b")
 model = AutoModelForCausalLM.from_pretrained("stabilityai/stablelm-tuned-alpha-3b")

@@ -153,8 +153,8 @@ impl OrtexTensor {
         contents
     }
 
-    pub fn slice<'a>(
-        &'a self,
+    pub fn slice(
+        &self,
         start_indicies: Vec<isize>,
         lengths: Vec<isize>,
         strides: Vec<isize>,
@@ -184,7 +184,7 @@ impl OrtexTensor {
         }
     }
 
-    pub fn to_bool(self) -> OrtexTensor {
+    pub fn into_bool(self) -> OrtexTensor {
         match self {
             OrtexTensor::u8(y) => {
                 let bool_tensor = y.to_owned().mapv(|x| match x {
@@ -205,7 +205,7 @@ impl OrtexTensor {
 
 fn slice_array<'a, T, D>(
     array: &'a Array<T, D>,
-    slice_specs: &'a Vec<(isize, Option<isize>, isize)>,
+    slice_specs: &'a [(isize, Option<isize>, isize)],
 ) -> ArrayView<'a, T, D>
 where
     D: Dimension,
@@ -216,7 +216,7 @@ where
     })
 }
 
-fn get_bytes<'a, T>(array: &'a ArrayBase<T, IxDyn>) -> &'a [u8]
+fn get_bytes<T>(array: &ArrayBase<T, IxDyn>) -> &[u8]
 where
     T: Data,
 {
@@ -343,7 +343,7 @@ macro_rules! concatenate {
     // `typ` is the actual datatype, `ort_tensor_kind` is the OrtexTensor variant
     ($tensors:expr, $axis:expr, $typ:ty, $ort_tensor_kind:ident) => {{
         type ArrayType<'a> = ArrayBase<ViewRepr<&'a $typ>, Dim<IxDynImpl>>;
-        fn filter(tensor: &OrtexTensor) -> Option<ArrayType> {
+        fn filter(tensor: &OrtexTensor) -> Option<ArrayType<'_>> {
             match tensor {
                 OrtexTensor::$ort_tensor_kind(x) => Some(x.view()),
                 _ => None,

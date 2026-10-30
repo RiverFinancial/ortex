@@ -46,9 +46,15 @@ def main():
     else:
         with tarfile.open(archive) as source:
             source.extractall(DESTINATION, filter="data")
-    pattern = {"Darwin": "libonnxruntime.*.dylib", "Linux": "libonnxruntime.so.*", "Windows": "onnxruntime.dll"}[system]
+    pattern = {
+        "Darwin": "libonnxruntime.*.dylib",
+        "Linux": "libonnxruntime.so.*",
+        "Windows": "onnxruntime.dll",
+    }[system]
     library = next((DESTINATION / name).rglob(pattern)).resolve()
-    RECEIPT.write_text(json.dumps({"version": version, "target": target, "library": str(library)}) + "\n")
+    RECEIPT.write_text(
+        json.dumps({"version": version, "target": target, "library": str(library)}) + "\n"
+    )
     print(library)
 
 

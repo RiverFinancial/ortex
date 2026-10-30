@@ -29,9 +29,9 @@ defmodule M do
 
     x = output |> Nx.backend_transfer() |> Nx.argmax(axis: 2)
     last = x[[.., -1]] |> Nx.new_axis(0)
-    IO.inspect(last[0][0] |> Nx.to_number)
+    IO.inspect(last[0][0] |> Nx.to_number())
 
-    case Enum.member?([50278, 50279, 50277, 1, 0], last[0][0] |> Nx.to_number) do
+    case Enum.member?([50278, 50279, 50277, 1, 0], last[0][0] |> Nx.to_number()) do
       true ->
         input
 
