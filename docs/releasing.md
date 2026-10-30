@@ -23,7 +23,9 @@ artifacts.json and SHA256SUMS. Partial local assembly omits --all and is explici
 marked incomplete. A release must never use partial assembly. Native archive
 metadata is normalized; no claim of reproducible native compilation is made.
 
-Push a matching vVERSION tag whose commit is already on the fork's main branch.
+Configure required reviewers and tag restrictions on the release environment,
+then explicitly enable ORTEX_STAGE_RELEASES in repository variables. Push a
+matching vVERSION tag whose commit is already on the fork's main branch.
 The staging workflow runs full compatibility and dependency audits, builds docs
 and the inventory, assembles the complete bundle, generates notes, and creates a
 draft GitHub release after protected-environment approval. Provenance covers the

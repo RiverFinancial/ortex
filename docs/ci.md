@@ -1,7 +1,7 @@
 # CI policy
 
 Checks runs all hygiene checks and the library, model, system, and package suites
-on three PR combinations. Main and the nightly use seven native combinations
+on three PR combinations. Main and the nightly use eight native combinations
 (pairwise BEAM/Nx/runtime boundaries and five host platforms), plus both Alpine
 architectures. This is an explicit selection, not a Cartesian product.
 The `ci:full` PR label opts into the complete matrix before merge.
@@ -46,3 +46,8 @@ Alpine edge repositories, whose transitive package selection is mutable. These
 images establish compatibility, not bit-for-bit reproducibility. glibc libraries
 are tested separately from musl. Published native artifacts include only the NIF;
 the consumer supplies ONNX Runtime.
+
+Full sweeps also assemble and verify the complete seven-target bundle, docs,
+source inventory, and release notes. The staging workflow consumes that tested
+bundle. Alpine prebuilt installation runs in a separate final image with neither
+Cargo nor rustc installed.
