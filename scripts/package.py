@@ -24,7 +24,11 @@ def version():
 def build():
     destination = ROOT / "dist" / f"ortex-{version()}.tar"
     destination.parent.mkdir(exist_ok=True)
-    subprocess.run(["mix", "hex.build", "--output", str(destination)], cwd=ROOT, check=True)
+    subprocess.run(
+        [shutil.which("mix") or "mix", "hex.build", "--output", str(destination)],
+        cwd=ROOT,
+        check=True,
+    )
     return destination
 
 

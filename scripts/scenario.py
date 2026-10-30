@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -12,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def execute(command, timeout, cwd=ROOT, env=None):
+    search = (os.environ if env is None else env).get("PATH", os.defpath)
+    command = [shutil.which(command[0], path=search) or command[0], *command[1:]]
     process = subprocess.Popen(
         command,
         cwd=cwd,
@@ -45,7 +48,12 @@ def main():
     if set(selected) - scenarios.keys():
         parser.error(f"unknown scenarios: {set(selected) - scenarios.keys()}")
     env = {**os.environ, "MIX_ENV": "test"}
-    subprocess.run(["mix", "compile", "--warnings-as-errors"], cwd=ROOT, env=env, check=True)
+    subprocess.run(
+        [shutil.which("mix") or "mix", "compile", "--warnings-as-errors"],
+        cwd=ROOT,
+        env=env,
+        check=True,
+    )
     results = []
     for name in selected:
         status, output = execute(

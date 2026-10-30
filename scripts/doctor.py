@@ -17,7 +17,9 @@ def main():
             print(f"MISSING: {executable}; run mise install / install rustup")
             failed = True
             continue
-        result = subprocess.run([executable, *arguments], capture_output=True, text=True)
+        result = subprocess.run(
+            [shutil.which(executable), *arguments], capture_output=True, text=True
+        )
         print(result.stdout.strip() or result.stderr.strip())
         failed |= result.returncode != 0
     runtime = os.environ.get("ORT_DYLIB_PATH")
