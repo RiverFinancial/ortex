@@ -6,13 +6,6 @@ config :elixir, :dbg_callback, {Macro, :dbg, []}
 config :ortex,
   add_backend_on_inspect: config_env() != :test
 
-# Set the cargo feature flags required to use the matching execution provider
-# based on the OS we're running on
-ortex_features =
-  case :os.type() do
-    {:win32, _} -> ["directml"]
-    {:unix, :darwin} -> ["coreml"]
-    {:unix, _} -> ["cuda", "tensorrt"]
-  end
-
-config :ortex, Ortex.Native, features: ortex_features
+# Do not infer accelerator support from the operating system. Runtime selection
+# stays explicit through ORT_DYLIB_PATH; compilation needs no runtime headers.
+config :ortex, Ortex.Native, features: ["ort/load-dynamic"]
