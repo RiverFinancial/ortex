@@ -37,6 +37,7 @@ defmodule Ortex.MixProject do
     [
       {:rustler, "~> 0.29.1"},
       {:nx, "~> 0.6"},
+      {:credo, "~> 1.7.19", only: :test, runtime: false},
       {:ex_doc, "~> 0.40.4", only: :docs, runtime: false}
     ]
   end
