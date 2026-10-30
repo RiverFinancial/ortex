@@ -1,5 +1,5 @@
 {
-  "tools": {"elixir": "1.20.4", "otp": "29.1.1", "rust": "1.93.1", "msrv": "1.92.0", "python": "3.12.12"},
+  "tools": {"elixir": "1.20.4", "otp": "29.1.1", "rust": "1.93.1", "msrv": "1.92.0", "python": "3.14.10"},
   "pr": [
     {"id": "linux-current", "os": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu", "elixir": "1.20.4", "otp": "29.1.1", "runtime": "1.24.4", "nx": "locked"},
     {"id": "linux-minimum", "os": "ubuntu-24.04", "target": "x86_64-unknown-linux-gnu", "elixir": "1.19.7", "otp": "28.5.0.8", "runtime": "1.19.2", "nx": "minimum"},

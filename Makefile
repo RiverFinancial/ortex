@@ -1,5 +1,6 @@
 .DEFAULT_GOAL := help
 PYTHON ?= python3
+VENV_PYTHON = $(if $(filter Windows_NT,$(OS)),.venv/Scripts/python.exe,.venv/bin/python)
 export PATH := $(CURDIR)/.venv/bin:$(CURDIR)/.venv/Scripts:$(CURDIR)/.cache/audit/bin:$(PATH)
 export MIX_ENV := test
 export ORT_DYLIB_PATH ?= $(shell $(PYTHON) scripts/install_runtime.py path 2>/dev/null)
@@ -18,7 +19,7 @@ setup: ## Fetch Mix dependencies and the development runtime
 	$(MAKE) deps
 	$(PYTHON) scripts/install_runtime.py install
 	$(PYTHON) -m venv .venv
-	.venv/bin/python -m pip install -r scripts/requirements.txt
+	$(VENV_PYTHON) -m pip install -r scripts/requirements.txt
 
 deps: ## Fetch the locked test and documentation dependencies
 	mix deps.get --check-locked
