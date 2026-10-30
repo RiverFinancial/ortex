@@ -17,7 +17,9 @@ that configuration; the foundation tests main's existing behavior.
 temporary directory, and runs the separate test/package project against it. It
 checks source compilation and an explicitly configured prebuilt library with
 Cargo/rustc replaced by failing stubs. The runtime path comes from the caller's
-ORT_DYLIB_PATH. This is a package installation check, not the feature stack's
+ORT_DYLIB_PATH. The package check also rejects a missing runtime in a separate VM; ort rc.8's
+legacy behavior is a caught NIF panic, not the migrated descriptive loader error.
+This is a package installation check, not the feature stack's
 automatic RustlerPrecompiled download path. That feature can reuse this harness.
 
 `make test.models` checks XGBoost, Iris, and MNIST. Prepared artifacts and reference

@@ -2,10 +2,13 @@
 
 import argparse
 import gzip
+import hashlib
 import io
+import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
@@ -40,7 +43,7 @@ def unpack(archive, destination):
 
 
 def nif_archive(target):
-    policy = __import__("json").loads((ROOT / "ci/compatibility.json").read_text())
+    policy = json.loads((ROOT / "ci/compatibility.json").read_text())
     targets = {row["target"] for key in ["pr", "platforms", "alpine"] for row in policy[key]}
     if target not in targets:
         raise ValueError("target is not in the artifact contract")
@@ -57,6 +60,72 @@ def nif_archive(target):
         entry.size, entry.mode = len(data), 0o644
         archive.addfile(entry, io.BytesIO(data))
     return destination
+
+
+def inspect_binary(data, target):
+    if "linux" in target:
+        if data[:4] != b"\x7fELF" or data[4:6] != b"\x02\x01":
+            raise ValueError("expected a little-endian ELF64 library")
+        machine = struct.unpack_from("<H", data, 18)[0]
+        expected = 183 if target.startswith("aarch64") else 62
+    elif "apple" in target:
+        if data[:4] != b"\xcf\xfa\xed\xfe":
+            raise ValueError("expected a Mach-O 64 library")
+        machine = struct.unpack_from("<I", data, 4)[0]
+        expected = 0x100000C if target.startswith("aarch64") else 0x1000007
+    else:
+        if data[:2] != b"MZ":
+            raise ValueError("expected a PE library")
+        offset = struct.unpack_from("<I", data, 0x3C)[0]
+        if data[offset : offset + 4] != b"PE\0\0":
+            raise ValueError("invalid PE signature")
+        machine = struct.unpack_from("<H", data, offset + 4)[0]
+        expected = 0x8664
+    if machine != expected:
+        raise ValueError(f"binary architecture does not match {target}")
+
+
+def assemble(require_all):
+    directory = ROOT / "dist"
+    policy = json.loads((ROOT / "ci/compatibility.json").read_text())
+    targets = {row["target"] for key in ["pr", "platforms", "alpine"] for row in policy[key]}
+    expected = {f"ortex-{version()}-{target}.tar.gz": target for target in targets}
+    archives = {path.name: path for path in directory.glob("ortex-*.tar.gz")}
+    if archives.keys() - expected.keys():
+        raise ValueError("unexpected native artifact version or target")
+    if require_all and archives.keys() != expected.keys():
+        raise ValueError(f"missing targets: {sorted(expected.keys() - archives.keys())}")
+    if not archives:
+        raise ValueError("no native archives")
+    for name, path in archives.items():
+        target = expected[name]
+        member_name = "libortex.dll" if "windows" in target else "libortex.so"
+        with tarfile.open(path) as archive:
+            members = archive.getmembers()
+            if len(members) != 1 or not members[0].isfile() or members[0].name != member_name:
+                raise ValueError(f"unexpected native archive contents: {name}")
+            inspect_binary(archive.extractfile(members[0]).read(), target)
+    build()
+    files = sorted(
+        [
+            *archives.values(),
+            directory / f"ortex-{version()}.tar",
+            *directory.glob("*.cdx.json"),
+            *directory.glob("docs-*.tar.gz"),
+        ]
+    )
+    digests = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in files}
+    (directory / "SHA256SUMS").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in digests.items())
+    )
+    (directory / "artifacts.json").write_text(
+        json.dumps(
+            {"version": version(), "complete": len(archives) == len(expected), "sha256": digests},
+            indent=2,
+        )
+        + "\n"
+    )
+    return digests
 
 
 def test_package(archive, mode, nif, timeout):
@@ -102,6 +171,13 @@ def test_package(archive, mode, nif, timeout):
             print(output, flush=True)
             if status:
                 return status
+        invalid = {**env, "ORT_DYLIB_PATH": str(directory / "missing-runtime")}
+        status, output = execute(
+            ["mix", "run", "--no-compile", "missing_runtime.exs"], timeout, cwd=project, env=invalid
+        )
+        print(output, flush=True)
+        if status:
+            return status
     return 0
 
 
@@ -111,6 +187,8 @@ def main():
     commands.add_parser("build")
     nif = commands.add_parser("nif")
     nif.add_argument("--target", required=True)
+    assembly = commands.add_parser("assemble")
+    assembly.add_argument("--all", action="store_true", help="require all seven native targets")
     test = commands.add_parser("test")
     test.add_argument("--archive", type=Path)
     test.add_argument("--mode", choices=["source", "prebuilt"], default="source")
@@ -122,6 +200,9 @@ def main():
         return 0
     if args.command == "nif":
         print(nif_archive(args.target))
+        return 0
+    if args.command == "assemble":
+        print(json.dumps(assemble(args.all), indent=2))
         return 0
     if args.timeout <= 0:
         parser.error("timeout must be positive")
