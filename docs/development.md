@@ -1,6 +1,7 @@
 # Development
 
-Use `mise install`, then `mise exec -- make setup` and `mise exec -- make doctor`.
+Review mise.toml and run `mise trust`, then `mise install`,
+`mise exec -- make setup`, and `mise exec -- make doctor`.
 Rustup reads the pinned rust-toolchain.toml. GNU Make 3.81 or newer is sufficient;
 Windows developers can use Git Bash with Make available on PATH.
 

@@ -1,64 +1,66 @@
 # Ortex
 
-`Ortex` is a wrapper around [ONNX Runtime](https://onnxruntime.ai/) (implemented as
-bindings to [`ort`](https://github.com/pykeio/ort)). Ortex leverages
-[`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html) to easily deploy ONNX models
-that run concurrently and distributed in a cluster. Ortex also provides a storage-only
-tensor implementation for ease of use.
+Ortex wraps [ONNX Runtime](https://onnxruntime.ai/) for Elixir through Rust and
+supports numeric tensor transfer and inference with Nx.Serving.
 
-ONNX models are a standard machine learning model format that can be exported from most ML
-libraries like PyTorch and TensorFlow. Ortex allows for easy loading and fast inference of
-ONNX models using different backends available to ONNX Runtime such as CUDA, TensorRT, Core
-ML, and ARM Compute Library.
+This is the RiverFinancial fork. Pin a reviewed commit from
+https://github.com/RiverFinancial/ortex when consuming unreleased work; the
+foundation stack does not publish a new Hex release.
 
-## Examples
+## Development
 
-TL;DR:
+Review `mise.toml`, run `mise trust` and `mise install`, then:
 
-```elixir
-iex> model = Ortex.load("./models/resnet50.onnx")
-#Ortex.Model<
-  inputs: [{"input", "Float32", [nil, 3, 224, 224]}]
-  outputs: [{"output", "Float32", [nil, 1000]}]>
-iex> {output} = Ortex.run(model, Nx.broadcast(0.0, {1, 3, 224, 224}))
-iex> output |> Nx.backend_transfer() |> Nx.argmax
-#Nx.Tensor<
-  s64
-  499
->
+```sh
+mise exec -- make setup
+mise exec -- make doctor
+mise exec -- make help
 ```
 
-Inspecting a model shows the expected inputs, outputs, data types, and shapes. Axes with
-`nil` represent a dynamic size.
+Supported BEAM pairs are Elixir 1.19 / OTP 28 and Elixir 1.20 / OTP 29. Rust 1.92
+is the minimum. The source NIF currently retains ort rc.8 / Rustler 0.29; their
+migration is separate feature work. Nx versions from 0.6.2 up to 1.0 are allowed
+(excluding 1.0), with 0.13.1 locked for normal development.
 
-To see more real world examples see the `examples` folder.
-
-### Serving
-
-`Ortex` also implements `Nx.Serving` behaviour. To use it in your application's
-supervision tree consult the `Nx.Serving` docs.
-
-```elixir
-iex> serving = Nx.Serving.new(Ortex.Serving, model)
-iex> batch = Nx.Batch.stack([{Nx.broadcast(0.0, {3, 224, 224})}])
-iex> {result} = Nx.Serving.run(serving, batch)
-iex> result |> Nx.backend_transfer() |> Nx.argmax(axis: 1)
-#Nx.Tensor<
-  s64[1]
-  [499]
->
-```
-
-## Installation
-
-`Ortex` can be installed by adding `ortex` to your list of dependencies in `mix.exs`:
+CPU dynamic loading is the development default. ONNX Runtime is installed
+separately by `make setup`. Make reads its recorded path; set ORT_DYLIB_PATH to
+use another library. When consuming this source package, configure the mode
+explicitly in your application's config:
 
 ```elixir
-def deps do
-  [
-    {:ortex, "~> 0.1.10"}
-  ]
-end
+import Config
+config :ortex, Ortex.Native, features: ["ort/load-dynamic"]
 ```
 
-You will need [Rust](https://www.rust-lang.org/tools/install) for compilation to succeed.
+The consumer supplies ORT_DYLIB_PATH. Execution providers require a matching
+runtime and explicit Cargo features; they are not inferred from the host OS.
+
+## Checks and examples
+
+```sh
+make check
+make test.system
+make test.package
+make test.models
+make coverage
+make docs
+make test.alpine
+make bench ARGS=5000
+```
+
+Library tests and doctests use normal ExUnit discovery under test/. System,
+package, and model suites are documented in [testing](docs/testing.md). XGBoost,
+Iris, and MNIST have prepared reference inputs and outputs; for example, with
+ORT_DYLIB_PATH set:
+
+```sh
+MIX_ENV=test mix run examples/run.exs xgboost
+```
+
+Numeric outputs use Ortex.Backend for storage. Transfer to a computation backend
+before arithmetic. See [examples](examples/README.md) and
+[Nx.Serving](https://hexdocs.pm/nx/Nx.Serving.html) for usage.
+
+[Development](docs/development.md), [CI policy](docs/ci.md), and
+[release procedures](docs/releasing.md) describe the supported environment,
+validation matrices, artifacts, and publishing gates.
