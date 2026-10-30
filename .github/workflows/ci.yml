@@ -1,49 +1,39 @@
-name: Test
+name: Baseline validation
 on:
   push:
     branches: [main]
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: baseline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    name: Linux ${{ matrix.elixir }}, ${{ matrix.otp }}
+  baseline:
     strategy:
+      fail-fast: false
       matrix:
-        elixir: ["1.17.3"]
-        otp: ["27.1.2"]
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     env:
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v2
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          otp-version: ${{ matrix.otp }}
-          elixir-version: ${{ matrix.elixir }}
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
-
-  macos:
-    runs-on: macos-latest
-    name: macOS
-    env:
-      MIX_ENV: test
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install
+          persist-credentials: false
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14.10'
+      - name: Supply the separately installed runtime
         run: |
-          brew update
-          brew install erlang@27 elixir
-      - name: Install dependencies
-        run: mix deps.get
-      - name: Compile and check warnings
-        run: mix compile --warnings-as-errors
-      - name: Check formatting
-        run: mix format --check-formatted
-      - name: Run tests
-        run: mix test
+          runtime_path=$(python scripts/install_runtime.py install)
+          echo "ORT_DYLIB_PATH=$runtime_path" >> "$GITHUB_ENV"
+      - run: mix deps.get --check-locked
+      - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
+      - run: mix test

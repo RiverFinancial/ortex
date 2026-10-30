@@ -5,20 +5,24 @@ defmodule Ortex.MixProject do
     [
       app: :ortex,
       version: "0.1.10",
-      elixir: "~> 1.14",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
 
       # Docs
       name: "Ortex",
-      source_url: "https://github.com/elixir-nx/ortex",
-      homepage_url: "http://github.com/elixir-nx/ortex",
+      source_url: "https://github.com/RiverFinancial/ortex",
+      homepage_url: "https://github.com/RiverFinancial/ortex",
       docs: [
         main: "readme",
         extras: ["README.md"]
       ],
       package: package()
     ]
+  end
+
+  def cli do
+    [preferred_envs: [docs: :docs]]
   end
 
   # Run "mix help compile.app" to learn about applications.
@@ -31,12 +35,9 @@ defmodule Ortex.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:rustler, "~> 0.27"},
+      {:rustler, "~> 0.29.1"},
       {:nx, "~> 0.6"},
-      {:tokenizers, "~> 0.4", only: :dev},
-      {:ex_doc, "0.29.4", only: :dev, runtime: false},
-      {:exla, "~> 0.6", only: :dev},
-      {:torchx, "~> 0.6", only: :dev}
+      {:ex_doc, "~> 0.40.4", only: :docs, runtime: false}
     ]
   end
 
@@ -45,7 +46,7 @@ defmodule Ortex.MixProject do
       files: ~w(lib .formatter.exs mix.exs README* LICENSE* native/ortex/src/ config/config.exs
         native/ortex/Cargo.lock native/ortex/Cargo.toml native/ortex/.cargo/config.toml),
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/elixir-nx/ortex"},
+      links: %{"GitHub" => "https://github.com/RiverFinancial/ortex"},
       description: "ONNX Runtime bindings for Elixir"
     ]
   end
