@@ -24,5 +24,6 @@ RUN apk add --no-cache git bash python3 ca-certificates && \
 WORKDIR /app
 ENV MIX_ENV=test ORT_DYLIB_PATH=/usr/lib/libonnxruntime.so.1.24.4
 COPY --from=build /app /app
+COPY --from=build /root/.mix /root/.mix
 RUN ! command -v cargo && ! command -v rustc
 CMD ["sh", "-ec", "python3 scripts/package.py test --mode prebuilt && if test -n \"${TARGET:-}\"; then python3 scripts/package.py nif --target \"$TARGET\"; fi"]
