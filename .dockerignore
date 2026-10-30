@@ -1,0 +1,15 @@
+.git
+deps
+_build
+priv
+native/ortex/target
+.venv
+.cache
+.ruff_cache
+runtime
+dist
+cover
+doc
+**/__pycache__
+examples/deps
+examples/_build
