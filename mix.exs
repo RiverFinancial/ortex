@@ -17,7 +17,13 @@ defmodule Ortex.MixProject do
       homepage_url: "https://github.com/RiverFinancial/ortex",
       docs: [
         main: "readme",
-        extras: ["README.md"]
+        extras: [
+          "README.md",
+          "docs/development.md",
+          "docs/testing.md",
+          "docs/ci.md",
+          "docs/releasing.md"
+        ]
       ],
       package: package()
     ]
@@ -38,7 +44,7 @@ defmodule Ortex.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.29.1"},
-      {:nx, "~> 0.6"},
+      {:nx, ">= 0.6.2 and < 1.0.0"},
       {:credo, "~> 1.7.19", only: :test, runtime: false},
       {:ex_doc, "~> 0.40.4", only: :docs, runtime: false}
     ]
@@ -46,7 +52,8 @@ defmodule Ortex.MixProject do
 
   defp package do
     [
-      files: ~w(lib .formatter.exs mix.exs README* LICENSE* native/ortex/src/ config/config.exs
+      files:
+        ~w(lib .formatter.exs mix.exs README* LICENSE* docs native/ortex/src/ config/config.exs
         native/ortex/Cargo.lock native/ortex/Cargo.toml native/ortex/.cargo/config.toml),
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/RiverFinancial/ortex"},

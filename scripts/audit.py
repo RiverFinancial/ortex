@@ -1,5 +1,6 @@
 """Report Rust advisories and retired Hex dependencies without hiding failures."""
 
+import json
 import os
 import subprocess
 import sys
@@ -41,6 +42,20 @@ def main():
         except (OSError, subprocess.TimeoutExpired) as error:
             status, output = 1, str(error)
         (destination / f"{name}.txt").write_text(output)
+        if name == "cargo-audit":
+            try:
+                data = json.JSONDecoder().raw_decode(output)[0]
+                (destination / "cargo-audit.json").write_text(json.dumps(data, indent=2) + "\n")
+                issues = data.get("vulnerabilities", {}).get("list", [])
+                warnings = sum(len(items) for items in data.get("warnings", {}).values())
+                output = f"{len(issues)} vulnerabilities; {warnings} informational warnings.\n"
+                if issues:
+                    output += "\n".join(
+                        f"{item['advisory']['id']}: {item['package']['name']} {item['package']['version']} — {item['advisory']['title']}"
+                        for item in issues
+                    )
+            except (ValueError, KeyError):
+                pass
         sections.append(
             f"## {name}: {'failed' if status else 'passed'}\n\n```text\n{output.rstrip()}\n```\n"
         )

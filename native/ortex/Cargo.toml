@@ -1,6 +1,8 @@
 [package]
 name = "ortex"
-version = "0.1.0"
+version = "0.1.10"
+license = "MIT"
+repository = "https://github.com/RiverFinancial/ortex"
 authors = []
 edition = "2018"
 rust-version = "1.92"
@@ -12,12 +14,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustler = "0.29.0"
-ort = { version = "2.0.0-rc.8", default-features = false, features = ["ndarray", "half"] }
+ort = { version = "=2.0.0-rc.8", default-features = false, features = ["ndarray", "half"] }
 ndarray = "0.16.1"
 half = "2.2.1"
-tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
-num-traits = "0.2.15"
-rustls = "0.22.4"
 
 [features]
 default = ["ort/load-dynamic"]

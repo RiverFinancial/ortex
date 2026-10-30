@@ -17,7 +17,9 @@ that configuration; the foundation tests main's existing behavior.
 temporary directory, and runs the separate test/package project against it. It
 checks source compilation and an explicitly configured prebuilt library with
 Cargo/rustc replaced by failing stubs. The runtime path comes from the caller's
-ORT_DYLIB_PATH. This is a package installation check, not the feature stack's
+ORT_DYLIB_PATH. The package check also rejects a missing runtime in a separate VM; ort rc.8's
+legacy behavior is a caught NIF panic, not the migrated descriptive loader error.
+This is a package installation check, not the feature stack's
 automatic RustlerPrecompiled download path. That feature can reuse this harness.
 
 `make test.models` checks XGBoost, Iris, and MNIST. Prepared artifacts and reference
@@ -26,7 +28,7 @@ from the original estimators; MNIST uses Python ORT as a binding reference, with
 synthetic pixels. None of these checks claim to validate ORT's operators or model
 accuracy. Iris uses tensor probabilities on main; ZipMap needs the separate
 container-output feature. Install fixtures/requirements.txt in a separate Python
-3.12 environment before `make fixtures`. Generation validates exports with ONNX
+3.12 environment before `make fixtures PYTHON=/path/to/exporter/bin/python`. Generation validates exports with ONNX
 and Python ORT; ordinary tests need neither Python exporters nor network access.
 
 `make test.tooling` checks the harnesses themselves, including partial staging,

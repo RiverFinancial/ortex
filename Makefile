@@ -9,6 +9,7 @@ export ORT_DYLIB_PATH ?= $(shell $(PYTHON) scripts/install_runtime.py path 2>/de
 .PHONY: test.system test.package test.models test.tooling coverage bench fixtures package
 .PHONY: test.alpine
 .PHONY: setup.audit audit setup.rust
+.PHONY: inventory release.notes
 
 help: ## Show development commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -88,3 +89,9 @@ setup.rust: ## Install the pinned Rust compiler, formatter, and Clippy
 
 audit: ## Report Rust advisories and retired Hex dependencies
 	$(PYTHON) scripts/audit.py
+
+inventory: ## Write the source dependency inventory (consumer-supplied ORT excluded)
+	MIX_ENV=prod $(PYTHON) scripts/inventory.py
+
+release.notes: ## Render conventional-commit notes and assembled artifact hashes
+	$(PYTHON) scripts/release.py notes $(ARGS)

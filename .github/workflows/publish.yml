@@ -1,0 +1,51 @@
+name: Publish approved Hex release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'RiverFinancial/ortex' && vars.ORTEX_HEX_PUBLISH == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      attestations: read # Verify the previously attested artifacts before publishing.
+      id-token: write # Exchange the protected job identity for a package-scoped Hex token.
+    env:
+      MIX_ENV: docs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: '1.20.4'
+          otp-version: '29.1.1'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14.10'
+      - name: Verify the approved release bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python scripts/release.py validate --tag "$RELEASE_TAG"
+          gh release download "$RELEASE_TAG" --repo RiverFinancial/ortex --dir dist
+          for artifact in dist/*; do
+            gh attestation verify "$artifact" --repo RiverFinancial/ortex
+          done
+          python scripts/release.py verify
+          make deps
+      - name: Publish package and documentation with Hex workload identity
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ORTEX_HEX_PUBLISH: ${{ vars.ORTEX_HEX_PUBLISH }}
+        run: python scripts/release.py publish --tag "$RELEASE_TAG"
