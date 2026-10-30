@@ -1,7 +1,7 @@
 defmodule Ortex.TestConcat do
   use ExUnit.Case
 
-  # Testing each type, since there's a bunch of boilerplate that we want to 
+  # Testing each type, since there's a bunch of boilerplate that we want to
   # check for errors on the Rust side
   %{
     "s8" => {:s, 8},

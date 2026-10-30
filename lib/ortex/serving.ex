@@ -8,7 +8,7 @@ defmodule Ortex.Serving do
 
   ## Examples
 
-  ### Inline/serverless workflow 
+  ### Inline/serverless workflow
 
   To quickly create an `Ortex.Serving` and run it
 

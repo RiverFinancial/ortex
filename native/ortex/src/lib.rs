@@ -30,12 +30,7 @@ fn init(
 }
 
 #[rustler::nif]
-fn show_session(
-    model: ResourceArc<model::OrtexModel>,
-) -> NifResult<(
-    Vec<(String, String, Option<Vec<i64>>)>,
-    Vec<(String, String, Option<Vec<i64>>)>,
-)> {
+fn show_session(model: ResourceArc<model::OrtexModel>) -> NifResult<model::SessionDescription> {
     Ok(model::show(model))
 }
 
@@ -43,7 +38,7 @@ fn show_session(
 fn run(
     model: ResourceArc<model::OrtexModel>,
     inputs: Vec<ResourceArc<OrtexTensor>>,
-) -> NifResult<Vec<(ResourceArc<OrtexTensor>, Vec<usize>, Atom, usize)>> {
+) -> NifResult<Vec<model::TensorOutput>> {
     model::run(model, inputs).map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
@@ -71,7 +66,7 @@ fn to_binary<'a>(
 }
 
 #[rustler::nif]
-pub fn slice<'a>(
+pub fn slice(
     tensor: ResourceArc<OrtexTensor>,
     start_indicies: Vec<isize>,
     lengths: Vec<isize>,
@@ -85,7 +80,7 @@ pub fn slice<'a>(
 }
 
 #[rustler::nif]
-pub fn reshape<'a>(
+pub fn reshape(
     tensor: ResourceArc<OrtexTensor>,
     shape: Vec<usize>,
 ) -> NifResult<ResourceArc<OrtexTensor>> {
@@ -93,7 +88,7 @@ pub fn reshape<'a>(
 }
 
 #[rustler::nif]
-pub fn concatenate<'a>(
+pub fn concatenate(
     tensors: Vec<ResourceArc<OrtexTensor>>,
     dtype: Term,
     axis: i32,
@@ -116,9 +111,14 @@ rustler::init!(
         reshape,
         concatenate
     ],
-    load = |env: Env, _| {
-        rustler::resource!(OrtexModel, env);
-        rustler::resource!(OrtexTensor, env);
-        true
-    }
+    load = load
 );
+
+// Rustler 0.29 expands resource registration into impls inside this callback.
+// Remove this compatibility allowance with the separate Rustler migration.
+#[allow(non_local_definitions)]
+fn load(env: Env, _info: Term) -> bool {
+    rustler::resource!(OrtexModel, env);
+    rustler::resource!(OrtexTensor, env);
+    true
+}

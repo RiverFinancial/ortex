@@ -14,7 +14,7 @@ use rustler::{Atom, Env, NifResult};
 use ort::{ExecutionProviderDispatch, GraphOptimizationLevel};
 
 /// A faster (unsafe) way of creating an Array from an Erlang binary
-fn initialize_from_raw_ptr<T>(ptr: *const T, shape: &[Ix]) -> ArrayViewMut<T, IxDyn> {
+fn initialize_from_raw_ptr<T>(ptr: *const T, shape: &[Ix]) -> ArrayViewMut<'_, T, IxDyn> {
     let array = unsafe { ArrayViewMut::from_shape_ptr(shape, ptr as *mut T) };
     array
 }
@@ -64,7 +64,7 @@ pub fn from_binary(
             initialize_from_raw_ptr(bin.as_ptr() as *const i64, &shape).to_owned(),
         ))),
         ("u", 8) => Ok(ResourceArc::new(OrtexTensor::u8(
-            initialize_from_raw_ptr(bin.as_ptr() as *const u8, &shape).to_owned(),
+            initialize_from_raw_ptr(bin.as_ptr(), &shape).to_owned(),
         ))),
         ("u", 16) => Ok(ResourceArc::new(OrtexTensor::u16(
             initialize_from_raw_ptr(bin.as_ptr() as *const u16, &shape).to_owned(),
